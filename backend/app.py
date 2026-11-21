@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import hmac
 import sqlite3
 import subprocess
 import threading
@@ -14,7 +15,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.supabase_store import SupabaseStore
@@ -30,6 +31,19 @@ STORE = SupabaseStore()
 
 app = FastAPI(title="ClipVlip API", version="0.3.0", description="AI video clipping studio with face-aware reframing")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+@app.middleware("http")
+async def protect_cloud_job_api(request, call_next):
+    path = request.url.path
+    protected = path == "/api/tasks" or path.startswith("/api/tasks/")
+    if STORE.enabled and protected:
+        expected = os.getenv("CLIPVLIP_ACCESS_KEY", "")
+        supplied = request.headers.get("x-clipvlip-key", "")
+        if not expected:
+            return JSONResponse(status_code=503, content={"detail": "Worker access key is not configured."})
+        if not hmac.compare_digest(supplied, expected):
+            return JSONResponse(status_code=401, content={"detail": "Worker access key is missing or invalid."})
+    return await call_next(request)
 
 
 def db():
@@ -391,7 +405,7 @@ async def create_task(source_url: str = Form(""), file: UploadFile | None = File
         with destination.open("wb") as output:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
-                if size > 4 * 1024 * 1024 * 1024:
+                if size > int(os.getenv("CLIPVLIP_MAX_UPLOAD_BYTES", str(4 * 1024 * 1024 * 1024))):
                     destination.unlink(missing_ok=True)
                     raise HTTPException(413, "Maximum upload size is 4 GB.")
                 output.write(chunk)
