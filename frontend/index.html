@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#09090f">
+  <meta name="description" content="ClipVlip is a local-first AI video clipping studio. No account or subscription required.">
+  <title>ClipVlip — AI Video Clipping Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="#"><span class="brand-mark">C<span>V</span></span><span>clipvlip<small>CREATOR STUDIO</small></span></a>
+    <div class="nav-label">WORKSPACE</div>
+    <button class="nav active" data-view="create"><span>✦</span> Create clips</button>
+    <button class="nav" data-view="library"><span>▤</span> My library</button>
+    <div class="side-bottom">
+      <div class="local-card"><span class="pulse"></span><div><b>Local-first mode</b><small>Your media stays on your machine</small></div></div>
+      <div class="side-foot">CLIPVLIP · OPEN SOURCE<br><span>No account. No subscription. No limits.</span></div>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div><div class="eyebrow">AI VIDEO WORKSPACE</div><h1 id="pageTitle">Create something <em>viral.</em></h1></div><span class="status"><i></i> SYSTEM READY</span></header>
+    <section id="createView">
+      <div class="hero"><div><div class="hero-tag">✦ YOUR AI CLIP ASSISTANT</div><h2>Long video in.<br><span>Great moments out.</span></h2><p>Drop in a video. ClipVlip finds the moments worth sharing and turns them into short-form content.</p></div><div class="hero-art"><div class="orb orb1"></div><div class="orb orb2"></div><div class="play">▶</div><div class="art-caption">AI MOMENT DETECTION</div></div></div>
+      <div class="workspace-grid">
+        <div class="panel input-panel">
+          <div class="panel-head"><div><div class="step">01 / SOURCE</div><h3>Bring your video</h3></div><span class="pill">MP4 · MOV · WEBM</span></div>
+          <div class="tabs"><button class="tab active" data-tab="upload">↑ Upload file</button><button class="tab" data-tab="url">↗ Paste a link</button></div>
+          <div id="uploadPane" class="dropzone"><input type="file" id="videoFile" accept="video/*" hidden><div class="upload-icon">↑</div><b>Drop your video here</b><span>or <button class="text-btn" id="browse">browse files</button></span><small>Up to 4 GB · Video formats supported by FFmpeg</small><div id="fileName" class="file-name"></div></div>
+          <div id="urlPane" class="url-pane hidden"><label for="videoUrl">VIDEO URL</label><input id="videoUrl" placeholder="https://youtube.com/watch?v=..." type="url"><small>Supported sources depend on yt-dlp and each platform's terms.</small></div>
+          <div class="divider"></div>
+          <div class="panel-head compact"><div><div class="step">02 / CLIP SETTINGS</div><h3>Make it yours</h3></div></div>
+          <div class="settings-grid">
+            <div class="field"><label for="clipCount">NUMBER OF CLIPS</label><select id="clipCount"><option>3</option><option selected>5</option><option>7</option><option>10</option><option>12</option></select></div>
+            <div class="field"><label for="ratio">ASPECT RATIO</label><select id="ratio"><option value="9:16">9:16 · Vertical</option><option value="16:9">16:9 · Landscape</option><option value="1:1">1:1 · Square</option></select></div>
+            <div class="field"><label for="minDuration">MIN DURATION</label><select id="minDuration"><option value="15">15 seconds</option><option value="20" selected>20 seconds</option><option value="30">30 seconds</option></select></div>
+            <div class="field"><label for="maxDuration">MAX DURATION</label><select id="maxDuration"><option value="45">45 seconds</option><option value="60" selected>60 seconds</option><option value="90">90 seconds</option><option value="120">120 seconds</option></select></div>
+          </div>
+          <div class="settings-grid caption-settings"><label class="caption-toggle"><input type="checkbox" id="captions" checked><span><b>Animated subtitles</b><small>Word-synced karaoke captions</small></span></label><div class="field"><label for="captionStyle">CAPTION STYLE</label><select id="captionStyle"><option value="bold">Bold creator</option><option value="clean">Clean</option><option value="neon">Neon</option><option value="minimal">Minimal</option></select></div></div>
+          <button class="primary-btn" id="generate"><span>✦</span> Find my best moments <b>→</b></button>
+          <div class="fineprint">AI transcription runs locally · Optional AI ranking via your own API key</div>
+        </div>
+        <div class="panel process-panel"><div class="panel-head"><div><div class="step">HOW IT WORKS</div><h3>From raw to remarkable</h3></div><span class="sparkle">✧</span></div>
+          <div class="process-list">
+            <div class="process-item"><div class="process-icon">◉</div><div><b>Understand</b><small>Local speech-to-text maps every word to its timestamp.</small></div><span>01</span></div>
+            <div class="process-item"><div class="process-icon">✧</div><div><b>Discover</b><small>AI looks for hooks, insights, stories and strong moments.</small></div><span>02</span></div>
+            <div class="process-item"><div class="process-icon">▧</div><div><b>Reframe</b><small>Convert the original video into vertical-ready clips.</small></div><span>03</span></div>
+            <div class="process-item"><div class="process-icon">↗</div><div><b>Export</b><small>Download MP4 clips and publish wherever you create.</small></div><span>04</span></div>
+          </div>
+          <div class="tip"><span>✦</span><div><b>A note on privacy</b><p>ClipVlip runs on your own machine. Your files and generated clips are stored locally. No account or cloud upload required.</p></div></div>
+        </div>
+      </div>
+    </section>
+    <section id="libraryView" class="hidden"><div class="library-head"><div><div class="step">YOUR PROJECTS</div><h2>Clip library</h2><p>Every project, ready when you are.</p></div><button class="secondary-btn" id="newProject">＋ New project</button></div><div id="tasks" class="task-list"></div></section>
+    <section id="activeTask" class="panel active-task hidden"><div class="panel-head"><div><div class="step">PROCESSING PROJECT</div><h3 id="taskTitle">Finding your moments</h3></div><span id="taskState" class="pill">QUEUED</span></div><div class="progress-track"><div id="progressBar"></div></div><div class="progress-meta"><span id="taskMessage">Waiting to start</span><b id="progressValue">0%</b></div><div id="clipResults" class="clip-results"></div></section>
+    <footer>MADE FOR CREATORS, NOT SUBSCRIPTION PLANS <span>CLIPVLIP © 2026</span></footer>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="/app.js"></script>
+</body></html>
