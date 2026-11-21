@@ -410,10 +410,13 @@ async def create_task(source_url: str = Form(""), file: UploadFile | None = File
         source_path = None
         if file:
             source_path = f"{task_id}/source{destination.suffix.lower()}"
-            STORE.upload(STORE.source_bucket, source_path, str(destination),
-                         file.content_type or "application/octet-stream")
+            source_mime = {
+                ".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime",
+                ".mkv": "video/x-matroska", ".webm": "video/webm", ".avi": "video/x-msvideo",
+            }[destination.suffix.lower()]
+            STORE.upload(STORE.source_bucket, source_path, str(destination), source_mime)
             STORE.save_asset(task_id, "source", source_path, destination.name,
-                             file.content_type or "application/octet-stream", destination.stat().st_size)
+                             source_mime, destination.stat().st_size)
         STORE.create_job({
             "id": task_id, "title": title, "source_type": "upload" if file else "url",
             "source_path": source_path, "source_url": None if file else source,
