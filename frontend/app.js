@@ -4,10 +4,11 @@ const $ = id => document.getElementById(id);
 $("engineSettings").addEventListener("click", () => {
   const next = window.prompt("Enter your ClipVlip worker API URL (for example https://api.your-domain.com). Leave blank to use same-origin API.", API_BASE);
   if (next === null) return;
-  const clean = next.trim().replace(/\/$/, "");
-  if (clean) {
+  const input = next.trim();
+  let normalized = "";
+  if (input) {
     let parsed;
-    try { parsed = new URL(clean); } catch { return toast("Enter a valid worker API URL."); }
+    try { parsed = new URL(input); } catch { return toast("Enter a valid worker API URL."); }
     const localHost = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
     if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && localHost)) {
       return toast("Use HTTPS for remote workers. HTTP is allowed only for localhost development.");
@@ -15,8 +16,9 @@ $("engineSettings").addEventListener("click", () => {
     if (parsed.username || parsed.password || parsed.search || parsed.hash) {
       return toast("Use a worker base URL without credentials, query parameters or fragments.");
     }
+    normalized = parsed.href.replace(/\/+$/, "");
   }
-  localStorage.setItem("clipvlip_api_base", clean);
+  localStorage.setItem("clipvlip_api_base", normalized);
   window.location.reload();
 });
 let mode = "upload", currentTask = null, pollTimer = null;
