@@ -15,4 +15,5 @@ def test_supabase_store_uses_private_bucket_defaults(monkeypatch):
     assert store.enabled is True
     assert store.source_bucket == "clipvlip-sources"
     assert store.output_bucket == "clipvlip-outputs"
-    assert "server-only-test-secret" not in str(store._headers())
+    assert store._headers()["Authorization"] == "Bearer server-only-test-secret"
+    assert store._headers()["apikey"] == "server-only-test-secret"
