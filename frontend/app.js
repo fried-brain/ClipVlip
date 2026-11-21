@@ -166,9 +166,12 @@ async function loadTasks() {
       const title = document.createElement("b");
       title.textContent = String(task.title || "Untitled project");
       const meta = document.createElement("small");
-      const created = Number(task.created);
-      const createdLabel = Number.isFinite(created) && created > 0
-        ? new Date(created * 1000).toLocaleString() : "Date unavailable";
+      const createdRaw = task.created_at || task.created;
+      const createdDate = typeof createdRaw === "string"
+        ? new Date(createdRaw)
+        : new Date(Number(createdRaw) * 1000);
+      const createdLabel = Number.isFinite(createdDate.getTime())
+        ? createdDate.toLocaleString() : "Date unavailable";
       const progress = Number(task.progress);
       const safeProgress = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
       meta.textContent = `${createdLabel} · ${String(task.status || "unknown")} · ${safeProgress}%`;
