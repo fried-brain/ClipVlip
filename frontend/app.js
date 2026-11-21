@@ -147,8 +147,38 @@ function escapeHtml(value) {
 async function loadTasks() {
   try {
     const response = await fetch(apiUrl("/api/tasks")), list = await response.json();
-    $("tasks").innerHTML = list.length ? list.map(task => `<div class="task-row"><div><b>${escapeHtml(task.title || "Untitled project")}</b><small>${new Date(task.created * 1000).toLocaleString()} · ${escapeHtml(task.status)} · ${task.progress || 0}%</small></div><button data-task="${escapeHtml(task.id)}">Open project →</button></div>`).join("") : '<div class="panel"><p class="empty">No projects yet. Your next great clip starts with a video.</p></div>';
-    $("tasks").querySelectorAll("[data-task]").forEach(button => button.addEventListener("click", () => openTask(button.dataset.task)));
+    const container = $("tasks");
+    container.replaceChildren();
+    if (!Array.isArray(list) || list.length === 0) {
+      const panel = document.createElement("div");
+      panel.className = "panel";
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "No projects yet. Your next great clip starts with a video.";
+      panel.append(empty);
+      container.append(panel);
+      return;
+    }
+    for (const task of list) {
+      const row = document.createElement("div");
+      row.className = "task-row";
+      const details = document.createElement("div");
+      const title = document.createElement("b");
+      title.textContent = String(task.title || "Untitled project");
+      const meta = document.createElement("small");
+      const created = Number(task.created);
+      const createdLabel = Number.isFinite(created) && created > 0
+        ? new Date(created * 1000).toLocaleString() : "Date unavailable";
+      const progress = Number(task.progress);
+      const safeProgress = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
+      meta.textContent = `${createdLabel} · ${String(task.status || "unknown")} · ${safeProgress}%`;
+      details.append(title, meta);
+      const button = document.createElement("button");
+      button.textContent = "Open project →";
+      button.addEventListener("click", () => openTask(String(task.id || "")));
+      row.append(details, button);
+      container.append(row);
+    }
   } catch (error) { toast("Could not load project library."); }
 }
 async function openTask(id) {
