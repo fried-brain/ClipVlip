@@ -106,11 +106,12 @@ A free-tier deployment blueprint is included in `render.yaml`. It creates a Dock
 2. Choose **New → Blueprint** and connect the public `fried-brain/ClipVlip` GitHub repository.
 3. Select the `main` branch and review the `render.yaml` blueprint. Confirm the service plan is **Free** before creating it.
 4. In the service's Environment settings, add:
+   - `CLIPVLIP_ACCESS_KEY`: a long random password (at least 32 characters). Generate it with a password manager; do not reuse an account password. The task API rejects requests without this key.
    - `SUPABASE_URL`: the project URL from Supabase → Project Settings → API.
    - `SUPABASE_SECRET_KEY`: the server-side secret key from Supabase → Project Settings → API Keys. Keep it private; never use a publishable key here.
 5. Wait for the first deploy to finish. Open `https://YOUR-SERVICE.onrender.com/api/health`; expect JSON with `status: ok`.
-6. Open the ClipVlip website, choose **Connect engine**, and enter `https://YOUR-SERVICE.onrender.com`.
+6. Open the ClipVlip website, choose **Connect engine**, enter `https://YOUR-SERVICE.onrender.com`, then enter the same worker access key when prompted. It is saved in this browser only.
 
 ### Free-tier caveats
 
-Render's free web services have 512 MB RAM, spin down after 15 minutes without inbound traffic, may restart, and have ephemeral local filesystems. The blueprint uses Whisper `tiny` and Supabase for persistent source/output storage, but video processing will be slow and large uploads or long renders may fail under the free memory/CPU limits. Keep the project page open while processing so it continues polling the worker. A free Render web service is a prototype/testing option, not reliable production compute. Check the current [Render free service limitations](https://render.com/docs/free) before deploying. The free plan is not a dedicated background-worker plan.
+Render's free web services have 512 MB RAM, spin down after 15 minutes without inbound traffic, may restart, and have ephemeral local filesystems. The blueprint uses Whisper `tiny` and Supabase for persistent source/output storage, but video processing will be slow and large uploads or long renders may fail under the free memory/CPU limits. Keep the project page open while processing so it continues polling the worker. A free Render web service is a prototype/testing option, not reliable production compute. Check the current [Render free service limitations](https://render.com/docs/free) before deploying. The free plan is not a dedicated background-worker plan. The worker access key is a shared single-user gate, not a full identity or multi-user authorization system. The browser stores it in local storage; use this setup only for your own private testing.
