@@ -15,7 +15,7 @@ class SupabaseStore:
         self.source_bucket = os.getenv("SUPABASE_SOURCE_BUCKET", "clipvlip-sources")
         self.output_bucket = os.getenv("SUPABASE_OUTPUT_BUCKET", "clipvlip-outputs")
         self.enabled = bool(self.url and self.key)
-        self.timeout = httpx.Timeout(120.0, connect=20.0)
+        self.timeout = httpx.Timeout(7200.0, connect=30.0, write=7200.0, read=7200.0)
 
     def _headers(self, prefer: str | None = None) -> dict[str, str]:
         headers = {"apikey": self.key, "Authorization": f"Bearer {self.key}"}
@@ -61,10 +61,14 @@ class SupabaseStore:
                 content=stream, headers={"Content-Type": content_type, "x-upsert": "true"})
 
     def download(self, bucket: str, path: str, destination: str) -> None:
-        response = self._request("GET",
-            f"/storage/v1/object/{quote(bucket)}/{quote(path, safe='/')}")
-        with open(destination, "wb") as stream:
-            stream.write(response.content)
+        if not self.enabled:
+            raise RuntimeError("Supabase is not configured.")
+        url = f"{self.url}/storage/v1/object/{quote(bucket)}/{quote(path, safe='/')}"
+        with httpx.stream("GET", url, headers=self._headers(), timeout=self.timeout) as response:
+            response.raise_for_status()
+            with open(destination, "wb") as stream:
+                for chunk in response.iter_bytes(1024 * 1024):
+                    stream.write(chunk)
 
     def save_asset(self, job_id: str, asset_type: str, path: str, filename: str,
                    content_type: str, size_bytes: int | None = None) -> None:
