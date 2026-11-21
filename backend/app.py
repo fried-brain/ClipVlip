@@ -36,7 +36,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 async def protect_cloud_job_api(request, call_next):
     path = request.url.path
     protected = path == "/api/tasks" or path.startswith("/api/tasks/")
-    if STORE.enabled and protected:
+    if STORE.enabled and protected and request.method != "OPTIONS":
         expected = os.getenv("CLIPVLIP_ACCESS_KEY", "")
         supplied = request.headers.get("x-clipvlip-key", "")
         if not expected:
