@@ -46,10 +46,6 @@ def db():
 def update(task_id: str, **values):
     if STORE.enabled:
         cloud_values = {k: v for k, v in values.items() if k in {"status", "progress", "message", "error"}}
-        if values.get("status") == "processing" and values.get("progress") == 5:
-            cloud_values["started_at"] = "now()"
-        if values.get("status") in {"completed", "failed"}:
-            cloud_values["completed_at"] = "now()"
         STORE.update_job(task_id, cloud_values)
         if "clips" in values:
             clips = json.loads(values["clips"]) if isinstance(values["clips"], str) else values["clips"]
@@ -67,7 +63,7 @@ def get_task(task_id: str):
         row = STORE.get_job(task_id)
         if row is None:
             return None
-        source = ("file:" + str(UPLOADS / task_id / "source.mp4")) if row["source_type"] == "upload" else (row.get("source_url") or "")
+        source = ("file:" + str(UPLOADS / task_id / Path(row.get("source_path") or "source.mp4").name)) if row["source_type"] == "upload" else (row.get("source_url") or "")
         return {"id": row["id"], "title": row["title"], "source": source,
                 "source_path": row.get("source_path"), "status": row["status"],
                 "progress": row["progress"], "message": row["message"],
@@ -389,7 +385,8 @@ async def create_task(source_url: str = Form(""), file: UploadFile | None = File
         extension = Path(file.filename or "video.mp4").suffix.lower() or ".mp4"
         if extension not in {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"}:
             raise HTTPException(400, "Unsupported video format.")
-        destination = UPLOADS / f"{task_id}{extension}"
+        destination = UPLOADS / task_id / f"source{extension}"
+        destination.parent.mkdir(parents=True, exist_ok=True)
         size = 0
         with destination.open("wb") as output:
             while chunk := await file.read(1024 * 1024):
