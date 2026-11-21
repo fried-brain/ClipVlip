@@ -278,8 +278,8 @@ def crop_filter(ratio: str, focus_x: float = 0.5) -> str:
     if ratio == "16:9":
         return "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
     if ratio == "1:1":
-        return f"scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080:x='(iw-ow)*{focus_x:.4f}':y=(ih-oh)/2"
-    return f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:x='(iw-ow)*{focus_x:.4f}':y=(ih-oh)/2"
+        return f"scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080:x='max(0,min(iw-ow,iw*{focus_x:.4f}-ow/2))':y=(ih-oh)/2"
+    return f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:x='max(0,min(iw-ow,iw*{focus_x:.4f}-ow/2))':y=(ih-oh)/2"
 
 
 def render_clip(video: Path, clip: dict, output: Path, ratio: str, captions: bool,
