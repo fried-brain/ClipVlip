@@ -15,3 +15,10 @@ def test_clip_media_urls_are_created_with_dom_apis_not_html_interpolation():
     assert "video.src = mediaUrl.href" in source
     assert "container.replaceChildren()" in source
     assert 'task.clips.map(clip => `<article class="clip-card">' not in source
+
+
+def test_worker_base_url_saves_normalized_parsed_url():
+    source = (Path(__file__).resolve().parents[1] / "frontend" / "app.js").read_text()
+    assert 'normalized = parsed.href.replace(/\\/+$/, "")' in source
+    assert 'localStorage.setItem("clipvlip_api_base", normalized)' in source
+    assert 'localStorage.setItem("clipvlip_api_base", clean)' not in source
