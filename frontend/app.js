@@ -56,7 +56,7 @@ document.querySelectorAll(".tab").forEach(item => item.addEventListener("click",
 }));
 $("browse").addEventListener("click", () => $("videoFile").click());
 $("videoFile").addEventListener("change", () => { $("fileName").textContent = $("videoFile").files[0]?.name || ""; });
-$("dropzone").addEventListener("click", event => { if (event.target.id !== "browse") $("videoFile").click(); });
+$("uploadPane").addEventListener("click", event => { if (event.target.id !== "browse") $("videoFile").click(); });
 $("uploadPane").addEventListener("dragover", event => { event.preventDefault(); $("uploadPane").style.borderColor = "#ad8aff"; });
 $("uploadPane").addEventListener("drop", event => {
   event.preventDefault();
