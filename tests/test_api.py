@@ -43,3 +43,12 @@ def test_create_task_persists_caption_preferences_without_auth(tmp_path, monkeyp
     assert task["settings"]["caption_style"] == "neon"
     assert task["settings"]["clip_count"] == 3
     assert task["source"].startswith("file:")
+
+
+def test_cloud_job_api_requires_worker_key(monkeypatch):
+    monkeypatch.setattr(app_module.STORE, "enabled", True)
+    monkeypatch.setenv("CLIPVLIP_ACCESS_KEY", "a-long-test-key")
+    client = TestClient(app_module.app)
+    assert client.get("/api/tasks").status_code == 401
+    assert client.get("/api/tasks", headers={"X-ClipVlip-Key": "wrong"}).status_code == 401
+    assert client.get("/api/health").status_code == 200
