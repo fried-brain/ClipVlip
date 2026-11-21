@@ -424,19 +424,29 @@ async def create_task(source_url: str = Form(""), file: UploadFile | None = File
         source_path = None
         if file:
             source_path = f"{task_id}/source{destination.suffix.lower()}"
-            source_mime = {
-                ".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime",
-                ".mkv": "video/x-matroska", ".webm": "video/webm", ".avi": "video/x-msvideo",
-            }[destination.suffix.lower()]
-            STORE.upload(STORE.source_bucket, source_path, str(destination), source_mime)
-            STORE.save_asset(task_id, "source", source_path, destination.name,
-                             source_mime, destination.stat().st_size)
+        # Create the parent job before inserting assets; video_assets.job_id
+        # has a foreign-key constraint referencing video_jobs.id.
         STORE.create_job({
             "id": task_id, "title": title, "source_type": "upload" if file else "url",
             "source_path": source_path, "source_url": None if file else source,
             "status": "queued", "progress": 0, "message": "Waiting to start",
             "settings": settings,
         })
+        if file:
+            source_mime = {
+                ".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime",
+                ".mkv": "video/x-matroska", ".webm": "video/webm", ".avi": "video/x-msvideo",
+            }[destination.suffix.lower()]
+            try:
+                STORE.upload(STORE.source_bucket, source_path, str(destination), source_mime)
+                STORE.save_asset(task_id, "source", source_path, destination.name,
+                                 source_mime, destination.stat().st_size)
+            except Exception as error:
+                STORE.update_job(task_id, {
+                    "status": "failed", "message": "Source upload failed",
+                    "error": str(error)[-2000:],
+                })
+                raise
     else:
         con = db()
         con.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?)",
