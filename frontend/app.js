@@ -5,7 +5,17 @@ $("engineSettings").addEventListener("click", () => {
   const next = window.prompt("Enter your ClipVlip worker API URL (for example https://api.your-domain.com). Leave blank to use same-origin API.", API_BASE);
   if (next === null) return;
   const clean = next.trim().replace(/\/$/, "");
-  if (clean && !/^https?:\/\//i.test(clean)) return toast("Enter a complete https:// API URL.");
+  if (clean) {
+    let parsed;
+    try { parsed = new URL(clean); } catch { return toast("Enter a valid worker API URL."); }
+    const localHost = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+    if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && localHost)) {
+      return toast("Use HTTPS for remote workers. HTTP is allowed only for localhost development.");
+    }
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+      return toast("Use a worker base URL without credentials, query parameters or fragments.");
+    }
+  }
   localStorage.setItem("clipvlip_api_base", clean);
   window.location.reload();
 });
@@ -86,7 +96,7 @@ async function poll() {
     $("taskMessage").textContent = task.message || "";
     if (task.status === "completed") {
       clearInterval(pollTimer);
-      $("clipResults").innerHTML = task.clips.map(clip => `<article class="clip-card"><video controls playsinline src="${apiUrl(clip.url)}"></video><div><b>${escapeHtml(clip.title)}</b><small>${Math.round(clip.start)}s – ${Math.round(clip.end)}s · ${Math.round(clip.end - clip.start)} sec</small><br><a href="${apiUrl(clip.url)}" download="${escapeHtml(clip.filename)}">↓ Download MP4</a></div></article>`).join("");
+      renderClipResults(task.clips);
       toast(task.clips.length + " clips are ready.");
     }
     if (task.status === "failed") {
@@ -96,6 +106,39 @@ async function poll() {
     }
   } catch (error) { console.error(error); }
 }
+function renderClipResults(clips) {
+  const container = $("clipResults");
+  container.replaceChildren();
+  for (const clip of clips) {
+    if (!clip || typeof clip.url !== "string" || !clip.url.startsWith("/api/clips/")) continue;
+    const mediaUrl = new URL(apiUrl(clip.url), window.location.origin);
+    const workerOrigin = API_BASE ? new URL(API_BASE).origin : window.location.origin;
+    if (!["https:", "http:"].includes(mediaUrl.protocol) || mediaUrl.origin !== workerOrigin) continue;
+
+    const article = document.createElement("article");
+    article.className = "clip-card";
+    const video = document.createElement("video");
+    video.controls = true;
+    video.playsInline = true;
+    video.src = mediaUrl.href;
+    const details = document.createElement("div");
+    const title = document.createElement("b");
+    title.textContent = String(clip.title || "Untitled clip");
+    const timing = document.createElement("small");
+    const start = Number(clip.start) || 0;
+    const end = Number(clip.end) || 0;
+    timing.textContent = `${Math.round(start)}s – ${Math.round(end)}s · ${Math.max(0, Math.round(end - start))} sec`;
+    const lineBreak = document.createElement("br");
+    const download = document.createElement("a");
+    download.href = mediaUrl.href;
+    download.download = String(clip.filename || "clip.mp4");
+    download.textContent = "↓ Download MP4";
+    details.append(title, timing, lineBreak, download);
+    article.append(video, details);
+    container.append(article);
+  }
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 }
