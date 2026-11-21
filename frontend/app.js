@@ -1,4 +1,14 @@
+const API_BASE = (localStorage.getItem("clipvlip_api_base") || "").replace(/\/$/, "");
+const apiUrl = path => API_BASE + path;
 const $ = id => document.getElementById(id);
+$("engineSettings").addEventListener("click", () => {
+  const next = window.prompt("Enter your ClipVlip worker API URL (for example https://api.your-domain.com). Leave blank to use same-origin API.", API_BASE);
+  if (next === null) return;
+  const clean = next.trim().replace(/\/$/, "");
+  if (clean && !/^https?:\/\//i.test(clean)) return toast("Enter a complete https:// API URL.");
+  localStorage.setItem("clipvlip_api_base", clean);
+  window.location.reload();
+});
 let mode = "upload", currentTask = null, pollTimer = null;
 function toast(message) {
   $("toast").textContent = message;
@@ -48,7 +58,7 @@ $("generate").addEventListener("click", async () => {
   button.disabled = true;
   button.textContent = "Starting your project…";
   try {
-    const response = await fetch("/api/tasks", { method: "POST", body: data });
+    const response = await fetch(apiUrl("/api/tasks"), { method: "POST", body: data });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Could not start processing");
     currentTask = result.id;
@@ -68,7 +78,7 @@ $("generate").addEventListener("click", async () => {
 async function poll() {
   if (!currentTask) return;
   try {
-    const response = await fetch("/api/tasks/" + encodeURIComponent(currentTask));
+    const response = await fetch(apiUrl("/api/tasks/" + encodeURIComponent(currentTask)));
     const task = await response.json();
     $("taskState").textContent = String(task.status).toUpperCase();
     $("progressBar").style.width = task.progress + "%";
@@ -76,7 +86,7 @@ async function poll() {
     $("taskMessage").textContent = task.message || "";
     if (task.status === "completed") {
       clearInterval(pollTimer);
-      $("clipResults").innerHTML = task.clips.map(clip => `<article class="clip-card"><video controls playsinline src="${clip.url}"></video><div><b>${escapeHtml(clip.title)}</b><small>${Math.round(clip.start)}s – ${Math.round(clip.end)}s · ${Math.round(clip.end - clip.start)} sec</small><br><a href="${clip.url}" download="${escapeHtml(clip.filename)}">↓ Download MP4</a></div></article>`).join("");
+      $("clipResults").innerHTML = task.clips.map(clip => `<article class="clip-card"><video controls playsinline src="${apiUrl(clip.url)}"></video><div><b>${escapeHtml(clip.title)}</b><small>${Math.round(clip.start)}s – ${Math.round(clip.end)}s · ${Math.round(clip.end - clip.start)} sec</small><br><a href="${apiUrl(clip.url)}" download="${escapeHtml(clip.filename)}">↓ Download MP4</a></div></article>`).join("");
       toast(task.clips.length + " clips are ready.");
     }
     if (task.status === "failed") {
@@ -91,7 +101,7 @@ function escapeHtml(value) {
 }
 async function loadTasks() {
   try {
-    const response = await fetch("/api/tasks"), list = await response.json();
+    const response = await fetch(apiUrl("/api/tasks")), list = await response.json();
     $("tasks").innerHTML = list.length ? list.map(task => `<div class="task-row"><div><b>${escapeHtml(task.title || "Untitled project")}</b><small>${new Date(task.created * 1000).toLocaleString()} · ${escapeHtml(task.status)} · ${task.progress || 0}%</small></div><button data-task="${escapeHtml(task.id)}">Open project →</button></div>`).join("") : '<div class="panel"><p class="empty">No projects yet. Your next great clip starts with a video.</p></div>';
     $("tasks").querySelectorAll("[data-task]").forEach(button => button.addEventListener("click", () => openTask(button.dataset.task)));
   } catch (error) { toast("Could not load project library."); }
