@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: clipvlip-worker
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: WHISPER_MODEL
+        value: tiny
+      - key: WHISPER_DEVICE
+        value: cpu
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8
+      - key: CLIPVLIP_DATA
+        value: /tmp/clipvlip-data
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_SOURCE_BUCKET
+        value: clipvlip-sources
+      - key: SUPABASE_OUTPUT_BUCKET
+        value: clipvlip-outputs
