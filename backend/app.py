@@ -110,7 +110,7 @@ def probe_duration(video: Path) -> float:
 def download_source(url: str, task_id: str) -> Path:
     folder = UPLOADS / task_id
     folder.mkdir(parents=True, exist_ok=True)
-    run(["yt-dlp", "--no-playlist", "-f", "bv*+ba/b", "--merge-output-format", "mp4",
+    run(["yt-dlp", "--no-playlist", "--max-filesize", os.getenv("CLIPVLIP_MAX_SOURCE_SIZE", "4G"), "-f", "bv*+ba/b", "--merge-output-format", "mp4",
          "-o", str(folder / "source.%(ext)s"), url], timeout=7200)
     files = [item for item in folder.iterdir() if item.is_file()]
     if not files:
