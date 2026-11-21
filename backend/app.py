@@ -335,7 +335,7 @@ async def create_task(source_url: str = Form(""), file: UploadFile | None = File
     }
     con = db()
     con.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (task_id, title, "upload" if file else source, "queued", 0, "Waiting to start",
+                (task_id, title, source, "queued", 0, "Waiting to start",
                  time.time(), json.dumps(settings), "[]", None))
     con.commit()
     con.close()
