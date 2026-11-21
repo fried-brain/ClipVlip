@@ -1,5 +1,9 @@
 const API_BASE = (localStorage.getItem("clipvlip_api_base") || "").replace(/\/$/, "");
 const apiUrl = path => API_BASE + path;
+const apiHeaders = () => {
+  const key = localStorage.getItem("clipvlip_access_key") || "";
+  return key ? { "X-ClipVlip-Key": key } : {};
+};
 const $ = id => document.getElementById(id);
 $("engineSettings").addEventListener("click", () => {
   const next = window.prompt("Enter your ClipVlip worker API URL (for example https://api.your-domain.com). Leave blank to use same-origin API.", API_BASE);
@@ -18,6 +22,14 @@ $("engineSettings").addEventListener("click", () => {
     }
     normalized = parsed.href.replace(/\/+$/, "");
   }
+  let accessKey = "";
+  if (normalized) {
+    accessKey = window.prompt("Enter the private worker access key configured in Render. This is stored only in this browser.", localStorage.getItem("clipvlip_access_key") || "");
+    if (accessKey === null) return;
+    accessKey = accessKey.trim();
+    if (!accessKey) return toast("A worker access key is required.");
+  }
+  localStorage.setItem("clipvlip_access_key", accessKey);
   localStorage.setItem("clipvlip_api_base", normalized);
   window.location.reload();
 });
@@ -70,7 +82,7 @@ $("generate").addEventListener("click", async () => {
   button.disabled = true;
   button.textContent = "Starting your project…";
   try {
-    const response = await fetch(apiUrl("/api/tasks"), { method: "POST", body: data });
+    const response = await fetch(apiUrl("/api/tasks"), { method: "POST", headers: apiHeaders(), body: data });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Could not start processing");
     currentTask = result.id;
@@ -90,7 +102,7 @@ $("generate").addEventListener("click", async () => {
 async function poll() {
   if (!currentTask) return;
   try {
-    const response = await fetch(apiUrl("/api/tasks/" + encodeURIComponent(currentTask)));
+    const response = await fetch(apiUrl("/api/tasks/" + encodeURIComponent(currentTask)), { headers: apiHeaders() });
     const task = await response.json();
     $("taskState").textContent = String(task.status).toUpperCase();
     $("progressBar").style.width = task.progress + "%";
@@ -146,7 +158,7 @@ function escapeHtml(value) {
 }
 async function loadTasks() {
   try {
-    const response = await fetch(apiUrl("/api/tasks")), list = await response.json();
+    const response = await fetch(apiUrl("/api/tasks"), { headers: apiHeaders() }), list = await response.json();
     const container = $("tasks");
     container.replaceChildren();
     if (!Array.isArray(list) || list.length === 0) {
