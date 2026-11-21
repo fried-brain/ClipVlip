@@ -84,3 +84,15 @@ GitHub Actions runs the same checks on pushes to `main` and pull requests.
 ## License
 
 ClipVlip's original starter implementation is provided under the MIT License. It is an independent implementation and does not include SupoClip source code. Review third-party dependency licenses separately.
+
+## Supabase backend foundation
+
+ClipVlip uses a dedicated Supabase project for persistent job metadata and private media storage.
+
+- Database tables: `video_jobs`, `video_assets`, and `video_clips`
+- Private Storage buckets: `clipvlip-sources` (4 GiB object limit) and `clipvlip-outputs` (1 GiB object limit)
+- Row Level Security is enabled on all application tables. No anon/authenticated policies are created; access is reserved for the trusted server-side worker using the Supabase secret key.
+- The worker must never expose `SUPABASE_SECRET_KEY` to the browser or commit it to source control.
+- Supabase Edge Functions are not used to run FFmpeg/Whisper jobs. Video rendering requires a separate persistent compute worker.
+
+Apply database changes with the SQL migration in `supabase/migrations/`. Configure `SUPABASE_URL` and `SUPABASE_SECRET_KEY` in the worker's private environment before enabling Supabase persistence.
