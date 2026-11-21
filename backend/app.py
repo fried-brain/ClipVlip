@@ -17,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend.supabase_store import SupabaseStore
+
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 DATA = Path(os.getenv("CLIPVLIP_DATA", ROOT / "data"))
@@ -24,6 +26,7 @@ UPLOADS, OUTPUTS = DATA / "uploads", DATA / "outputs"
 for folder in (UPLOADS, OUTPUTS):
     folder.mkdir(parents=True, exist_ok=True)
 DB = DATA / "clipvlip.db"
+STORE = SupabaseStore()
 
 app = FastAPI(title="ClipVlip API", version="0.3.0", description="AI video clipping studio with face-aware reframing")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -41,6 +44,17 @@ def db():
 
 
 def update(task_id: str, **values):
+    if STORE.enabled:
+        cloud_values = {k: v for k, v in values.items() if k in {"status", "progress", "message", "error"}}
+        if values.get("status") == "processing" and values.get("progress") == 5:
+            cloud_values["started_at"] = "now()"
+        if values.get("status") in {"completed", "failed"}:
+            cloud_values["completed_at"] = "now()"
+        STORE.update_job(task_id, cloud_values)
+        if "clips" in values:
+            clips = json.loads(values["clips"]) if isinstance(values["clips"], str) else values["clips"]
+            STORE.replace_clips(task_id, clips)
+        return
     con = db()
     assignments = ", ".join(f"{key}=?" for key in values)
     con.execute(f"UPDATE tasks SET {assignments} WHERE id=?", (*values.values(), task_id))
@@ -49,6 +63,16 @@ def update(task_id: str, **values):
 
 
 def get_task(task_id: str):
+    if STORE.enabled:
+        row = STORE.get_job(task_id)
+        if row is None:
+            return None
+        source = ("file:" + str(UPLOADS / task_id / "source.mp4")) if row["source_type"] == "upload" else (row.get("source_url") or "")
+        return {"id": row["id"], "title": row["title"], "source": source,
+                "source_path": row.get("source_path"), "status": row["status"],
+                "progress": row["progress"], "message": row["message"],
+                "created": row.get("created_at"), "settings": row.get("settings") or {},
+                "clips": STORE.get_clips(task_id), "error": row.get("error")}
     con = db()
     row = con.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
     con.close()
@@ -305,6 +329,9 @@ def process(task_id: str, settings: dict):
         update(task_id, status="processing", progress=5, message="Preparing source video")
         source = task["source"]
         video = Path(source[5:]) if source.startswith("file:") else download_source(source, task_id)
+        if STORE.enabled and task.get("source_path") and not video.exists():
+            video.parent.mkdir(parents=True, exist_ok=True)
+            STORE.download(STORE.source_bucket, task["source_path"], str(video))
         if not video.exists():
             raise RuntimeError("Source video file is missing.")
         duration = probe_duration(video)
@@ -327,7 +354,13 @@ def process(task_id: str, settings: dict):
             focus_x = detect_focus_x(video, float(clip["start"]), float(clip["end"])) if settings.get("smart_reframe", True) else 0.5
             render_clip(video, clip, folder / filename, settings.get("aspect_ratio", "9:16"),
                         bool(settings.get("captions", False)), transcript, settings.get("caption_style", "bold"), focus_x)
+            storage_path = f"{task_id}/{filename}"
+            if STORE.enabled:
+                STORE.upload(STORE.output_bucket, storage_path, str(folder / filename), "video/mp4")
+                STORE.save_asset(task_id, "clip", storage_path, filename, "video/mp4",
+                                 (folder / filename).stat().st_size)
             results.append({**clip, "id": index, "filename": filename,
+                            "storage_path": storage_path,
                             "url": f"/api/clips/{task_id}/{filename}"})
         update(task_id, status="completed", progress=100, message=f"{len(results)} clips are ready",
                clips=json.dumps(results))
@@ -376,18 +409,35 @@ async def create_task(source_url: str = Form(""), file: UploadFile | None = File
         "smart_reframe": True,
         "caption_style": caption_style if caption_style in ("bold", "clean", "neon", "minimal") else "bold",
     }
-    con = db()
-    con.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (task_id, title, source, "queued", 0, "Waiting to start",
-                 time.time(), json.dumps(settings), "[]", None))
-    con.commit()
-    con.close()
+    if STORE.enabled:
+        source_path = None
+        if file:
+            source_path = f"{task_id}/source{destination.suffix.lower()}"
+            STORE.upload(STORE.source_bucket, source_path, str(destination),
+                         file.content_type or "application/octet-stream")
+            STORE.save_asset(task_id, "source", source_path, destination.name,
+                             file.content_type or "application/octet-stream", destination.stat().st_size)
+        STORE.create_job({
+            "id": task_id, "title": title, "source_type": "upload" if file else "url",
+            "source_path": source_path, "source_url": None if file else source,
+            "status": "queued", "progress": 0, "message": "Waiting to start",
+            "settings": settings,
+        })
+    else:
+        con = db()
+        con.execute("INSERT INTO tasks VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (task_id, title, source, "queued", 0, "Waiting to start",
+                     time.time(), json.dumps(settings), "[]", None))
+        con.commit()
+        con.close()
     threading.Thread(target=process, args=(task_id, settings), daemon=True).start()
     return {"id": task_id, "status": "queued"}
 
 
 @app.get("/api/tasks")
 def tasks():
+    if STORE.enabled:
+        return [{**row, "clips": STORE.get_clips(row["id"])} for row in STORE.list_jobs()]
     con = db()
     rows = con.execute("SELECT * FROM tasks ORDER BY created DESC LIMIT 50").fetchall()
     con.close()
@@ -412,6 +462,12 @@ def clip_file(task_id: str, filename: str):
     if "/" in filename or ".." in filename:
         raise HTTPException(400, "Invalid filename")
     path = OUTPUTS / task_id / filename
+    if not path.is_file() and STORE.enabled:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            STORE.download(STORE.output_bucket, f"{task_id}/{filename}", str(path))
+        except Exception:
+            path.unlink(missing_ok=True)
     if not path.is_file():
         raise HTTPException(404, "Clip not found")
     return FileResponse(path, media_type="video/mp4", filename=filename)
@@ -423,6 +479,12 @@ def source_file(task_id: str):
     if not task_data or not task_data["source"].startswith("file:"):
         raise HTTPException(404, "Source not found")
     path = Path(task_data["source"][5:])
+    if not path.is_file() and STORE.enabled and task_data.get("source_path"):
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            STORE.download(STORE.source_bucket, task_data["source_path"], str(path))
+        except Exception:
+            path.unlink(missing_ok=True)
     if not path.is_file():
         raise HTTPException(404, "Source not found")
     return FileResponse(path)
