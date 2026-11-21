@@ -96,3 +96,21 @@ ClipVlip uses a dedicated Supabase project for persistent job metadata and priva
 - Supabase Edge Functions are not used to run FFmpeg/Whisper jobs. Video rendering requires a separate persistent compute worker.
 
 Apply database changes with the SQL migration in `supabase/migrations/`. Configure `SUPABASE_URL` and `SUPABASE_SECRET_KEY` in the worker's private environment before enabling Supabase persistence.
+
+
+## Free worker deployment (Render)
+
+A free-tier deployment blueprint is included in `render.yaml`. It creates a Docker web service from this repository, uses the lightweight Whisper `tiny` model, and configures the Supabase credentials as private environment variables.
+
+1. Sign in to [Render](https://dashboard.render.com/).
+2. Choose **New → Blueprint** and connect the public `fried-brain/ClipVlip` GitHub repository.
+3. Select the `main` branch and review the `render.yaml` blueprint. Confirm the service plan is **Free** before creating it.
+4. In the service's Environment settings, add:
+   - `SUPABASE_URL`: the project URL from Supabase → Project Settings → API.
+   - `SUPABASE_SECRET_KEY`: the server-side secret key from Supabase → Project Settings → API Keys. Keep it private; never use a publishable key here.
+5. Wait for the first deploy to finish. Open `https://YOUR-SERVICE.onrender.com/api/health`; expect JSON with `status: ok`.
+6. Open the ClipVlip website, choose **Connect engine**, and enter `https://YOUR-SERVICE.onrender.com`.
+
+### Free-tier caveats
+
+Render's free web services have 512 MB RAM, spin down after 15 minutes without inbound traffic, may restart, and have ephemeral local filesystems. The blueprint uses Whisper `tiny` and Supabase for persistent source/output storage, but video processing will be slow and large uploads or long renders may fail under the free memory/CPU limits. Keep the project page open while processing so it continues polling the worker. A free Render web service is a prototype/testing option, not reliable production compute. Check the current [Render free service limitations](https://render.com/docs/free) before deploying. The free plan is not a dedicated background-worker plan.
