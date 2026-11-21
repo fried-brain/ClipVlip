@@ -1,6 +1,6 @@
 # ClipVlip
 
-**A local-first AI video clipping studio. No login, no signup, no subscriptions, no watermark.**
+**An AI video clipping studio with face-aware reframing. No login, no signup, no subscriptions, no watermark.**
 
 ClipVlip takes a long-form video, transcribes it locally with Whisper, identifies compelling moments, and renders short MP4 clips with FFmpeg. An optional OpenAI-compatible endpoint can improve moment selection; without an API key, a local transcript heuristic is used.
 
@@ -11,6 +11,7 @@ ClipVlip takes a long-form video, transcribes it locally with Whisper, identifie
 - Optional LLM-assisted moment selection via OpenAI-compatible chat completions
 - Transcript-based fallback selection when no LLM key is configured
 - 9:16, 16:9 and 1:1 output presets
+- Face-aware crop positioning for vertical and square exports, with centre-crop fallback
 - Configurable clip count and duration
 - MP4 rendering with FFmpeg
 - Word-synchronised animated karaoke captions (ASS subtitles)
@@ -33,7 +34,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Open http://localhost:8000. The Docker port is bound to localhost by default; do not expose this unauthenticated local-first service directly to the public internet.
+Open http://localhost:8000. The Docker port is bound to localhost by default; do not expose this unauthenticated service directly to the public internet. For the Vercel-hosted interface, deploy the `frontend/` directory and use the **Connect engine** control to enter the separately hosted worker API URL. The processing API needs a persistent container host with FFmpeg, OpenCV and writable storage; Vercel Functions are not used for video rendering.
 
 ## Run without Docker
 
@@ -54,9 +55,13 @@ Set `OPENAI_API_KEY`, `OPENAI_BASE_URL`, and `CLIPVLIP_LLM_MODEL` in `.env`. Com
 
 ## Notes and current limitations
 
-This is ClipVlip v0.2, not a feature-complete parity clone. The caption renderer uses Whisper word timestamps and burns animated ASS karaoke captions into exported MP4 files. Face tracking, a multi-track timeline editor, B-roll, social publishing, and advanced scene-aware reframing remain planned. Face-aware crop detection is not yet implemented; current vertical output uses a centered crop. Background tasks run in-process in this MVP, so keep the service running during renders. The local database and media are stored under `data/`.
+This is ClipVlip v0.3, not a feature-complete parity clone. The caption renderer uses Whisper word timestamps and burns animated ASS karaoke captions into exported MP4 files. Face-aware reframing samples several frames within each selected clip, detects faces with OpenCV, and places the median detected face centre near the output crop centre. If no face is detected, it safely falls back to centred framing. This is a stable clip-level crop, not continuous per-frame camera tracking. A multi-track timeline editor, B-roll, and social publishing remain planned. Background tasks run in-process in this MVP, so keep the service running during renders. The local database and media are stored under `data/`.
 
 URL downloading depends on upstream sites and their terms. Only process videos you own or have permission to use. YouTube and other services may restrict automated downloading; do not bypass access controls.
+
+## Vercel frontend deployment
+
+The Vercel project uses `frontend/` as its root directory and serves the static creator interface. The **Connect engine** control stores the URL of your separately hosted ClipVlip worker API in browser local storage. Configure the worker with HTTPS and CORS for your Vercel domain before connecting it. Add authentication and upload limits before opening the worker to public traffic.
 
 ## Development checks
 

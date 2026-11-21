@@ -25,7 +25,7 @@ for folder in (UPLOADS, OUTPUTS):
     folder.mkdir(parents=True, exist_ok=True)
 DB = DATA / "clipvlip.db"
 
-app = FastAPI(title="ClipVlip API", version="0.2.0", description="Local-first AI video clipping studio")
+app = FastAPI(title="ClipVlip API", version="0.3.0", description="AI video clipping studio with face-aware reframing")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -236,15 +236,56 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return header + "\n".join(events) + ("\n" if events else "")
 
 
-def render_clip(video: Path, clip: dict, output: Path, ratio: str, captions: bool,
-                transcript: list[dict[str, Any]] | None = None, caption_style: str = "bold"):
-    start, end = float(clip["start"]), float(clip["end"])
+
+def detect_focus_x(video: Path, start: float, end: float) -> float:
+    """Estimate a stable horizontal subject centre from sampled frames."""
+    try:
+        import cv2
+        cascade = cv2.CascadeClassifier(str(Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"))
+        if cascade.empty():
+            return 0.5
+        capture = cv2.VideoCapture(str(video))
+        if not capture.isOpened():
+            return 0.5
+        centres = []
+        try:
+            span = max(0.0, end - start)
+            for fraction in (0.15, 0.3, 0.5, 0.7, 0.85):
+                capture.set(cv2.CAP_PROP_POS_MSEC, (start + span * fraction) * 1000)
+                ok, frame = capture.read()
+                if not ok:
+                    continue
+                height, width = frame.shape[:2]
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5,
+                                                  minSize=(max(24, width // 30), max(24, height // 30)))
+                if len(faces):
+                    x, y, w, h = max(faces, key=lambda box: box[2] * box[3])
+                    centres.append((x + w / 2) / max(1, width))
+        finally:
+            capture.release()
+        if not centres:
+            return 0.5
+        centres.sort()
+        return max(0.15, min(0.85, centres[len(centres) // 2]))
+    except Exception:
+        return 0.5
+
+
+def crop_filter(ratio: str, focus_x: float = 0.5) -> str:
+    """Build output geometry with the detected face near horizontal centre."""
+    focus_x = max(0.15, min(0.85, float(focus_x)))
     if ratio == "16:9":
-        video_filter = "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
-    elif ratio == "1:1":
-        video_filter = "scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080"
-    else:
-        video_filter = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
+        return "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
+    if ratio == "1:1":
+        return f"scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080:x='max(0,min(iw-ow,iw*{focus_x:.4f}-ow/2))':y=(ih-oh)/2"
+    return f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:x='max(0,min(iw-ow,iw*{focus_x:.4f}-ow/2))':y=(ih-oh)/2"
+
+
+def render_clip(video: Path, clip: dict, output: Path, ratio: str, captions: bool,
+                transcript: list[dict[str, Any]] | None = None, caption_style: str = "bold", focus_x: float = 0.5):
+    start, end = float(clip["start"]), float(clip["end"])
+    video_filter = crop_filter(ratio, focus_x)
     subtitle_file = output.with_suffix(".ass")
     if captions and transcript:
         subtitle_file.write_text(build_ass_subtitles(transcript, start, end, caption_style, ratio), encoding="utf-8")
@@ -283,8 +324,9 @@ def process(task_id: str, settings: dict):
             update(task_id, progress=55 + int(40 * index / len(clips)),
                    message=f"Rendering clip {index} of {len(clips)}")
             filename = f"clip-{index:02d}.mp4"
+            focus_x = detect_focus_x(video, float(clip["start"]), float(clip["end"])) if settings.get("smart_reframe", True) else 0.5
             render_clip(video, clip, folder / filename, settings.get("aspect_ratio", "9:16"),
-                        bool(settings.get("captions", False)), transcript, settings.get("caption_style", "bold"))
+                        bool(settings.get("captions", False)), transcript, settings.get("caption_style", "bold"), focus_x)
             results.append({**clip, "id": index, "filename": filename,
                             "url": f"/api/clips/{task_id}/{filename}"})
         update(task_id, status="completed", progress=100, message=f"{len(results)} clips are ready",
@@ -331,6 +373,7 @@ async def create_task(source_url: str = Form(""), file: UploadFile | None = File
         "max_duration": max_duration,
         "aspect_ratio": aspect_ratio if aspect_ratio in ("9:16", "16:9", "1:1") else "9:16",
         "captions": captions,
+        "smart_reframe": True,
         "caption_style": caption_style if caption_style in ("bold", "clean", "neon", "minimal") else "bold",
     }
     con = db()
