@@ -20,6 +20,12 @@ services:
         value: int8
       - key: CLIPVLIP_DATA
         value: /tmp/clipvlip-data
+      - key: CLIPVLIP_ACCESS_KEY
+        sync: false
+      - key: CLIPVLIP_MAX_UPLOAD_BYTES
+        value: "262144000"
+      - key: CLIPVLIP_MAX_SOURCE_SIZE
+        value: 250M
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SECRET_KEY
