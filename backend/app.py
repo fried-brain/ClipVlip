@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.supabase_store import SupabaseStore
+from backend.mobile_config import router as mobile_router
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -31,6 +32,7 @@ STORE = SupabaseStore()
 
 app = FastAPI(title="ClipVlip API", version="0.3.0", description="AI video clipping studio with face-aware reframing")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(mobile_router)
 
 @app.middleware("http")
 async def protect_cloud_job_api(request, call_next):
