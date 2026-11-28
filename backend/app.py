@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.supabase_store import SupabaseStore
+from backend.mobile_config import router as mobile_router
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
@@ -31,12 +32,13 @@ STORE = SupabaseStore()
 
 app = FastAPI(title="ClipVlip API", version="0.3.0", description="AI video clipping studio with face-aware reframing")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(mobile_router)
 
 @app.middleware("http")
 async def protect_cloud_job_api(request, call_next):
     path = request.url.path
     protected = path == "/api/tasks" or path.startswith("/api/tasks/")
-    if STORE.enabled and protected and request.method != "OPTIONS":
+    if protected and request.method != "OPTIONS":
         expected = os.getenv("CLIPVLIP_ACCESS_KEY", "")
         supplied = request.headers.get("x-clipvlip-key", "")
         if not expected:
@@ -380,7 +382,7 @@ def process(task_id: str, settings: dict):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "name": "ClipVlip", "auth": "disabled", "billing": "disabled"}
+    return {"status": "ok", "name": "ClipVlip", "auth": "required_for_tasks", "billing": "disabled"}
 
 
 @app.post("/api/tasks")

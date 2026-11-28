@@ -4,7 +4,7 @@ services:
     runtime: docker
     plan: free
     region: singapore
-    branch: main
+    branch: feat/android-dual-updates
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/health

@@ -1,41 +1,47 @@
 # ClipVlip Android
 
-Native Android companion for the ClipVlip creator studio.
+## Update architecture
 
-## First milestone
+ClipVlip supports two mutually compatible native update routes:
 
-- Kotlin and Jetpack Compose application shell.
-- Separate downloadable on-device language models.
-- SHA-256 verification before a model is accepted as installed.
-- LiteRT-LM runtime dependency and background-thread model loader.
-- Model binaries stay in app-private internal storage and are never uploaded to Supabase.
+- **Direct release:** signed APKs published as GitHub Releases assets. The app checks the latest release, requires a SHA-256 digest, downloads and verifies the APK, then hands installation to Android. Android requires the user to approve installation and allow this app as an install source.
+- **Google Play:** Google Play In-App Updates SDK is included. This route works only when the installed package was installed through Google Play and a compatible update is available to that Play account/device. Flexible update checks are supported by the Play SDK.
 
-## Model catalogue
+The app stores an update-channel preference (automatic/direct/Google Play). Android/Play installation source restrictions still apply; selecting Play does not turn a sideloaded install into a Play install.
 
-| Model | App task | Artifact | Approx. download |
-|---|---|---|---:|
-| Qwen 2.5 Instruct 1.5B | Transcript refinement and captions | LiteRT-LM Q8, 4096 KV | 1.60 GB |
-| DeepSeek-R1-Distill-Qwen 1.5B | Highlight reasoning and hook generation | LiteRT-LM Q8, 4096 KV | 1.83 GB |
+## Release version control
 
-The catalogue pins Hugging Face artifact URLs, exact byte lengths and LFS SHA-256 digests. Downloads are streamed to a temporary file and only moved into the installed model directory after both size and checksum match.
+- Work on feature branches and merge reviewed PRs into `main`.
+- Tag releases using semantic versions, for example `v0.2.0`.
+- Tag push runs `.github/workflows/release-android.yml`, building a signed APK and AAB and attaching them to the GitHub Release.
+- Build versionCode is generated from the release workflow run number. Do not reuse a versionCode.
+- The same Android upload/signing key must be retained for every update to an existing installation.
 
-The 0.5B Qwen option and Whisper Tiny INT8/Sherpa-ONNX speech pack are not shown as downloadable yet. Their final Android artifact variants and checksums must be pinned before enabling installation.
+## Required GitHub Actions secrets
 
-## Build
+Before the first signed release, configure:
 
-Open this android directory in Android Studio with JDK 17 and Android SDK 36 installed. Gradle sync downloads the declared dependencies.
+- `ANDROID_KEYSTORE_BASE64`: base64-encoded JKS/PKCS12 upload keystore.
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
 
-The first build uses LiteRT-LM 0.18.0 or newer. Media3, Sherpa-ONNX, Silero VAD and yt-dlp integration are separate follow-up milestones so the model manager remains independently testable.
+Do not commit the keystore or passwords. Losing the signing key prevents direct APK updates from installing over an existing copy. Keep a secure offline backup.
 
-## Architecture boundaries
+Google Play publishing is optional and disabled until repository variable `GOOGLE_PLAY_ENABLED=true` and secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` are configured. The workflow can then be manually dispatched to upload an AAB to internal, alpha, beta or production tracks. A Play Console app, Play App Signing and service-account permissions are prerequisites.
 
-- On device: source media selection, speech processing, local LLM inference, clip editing and export.
-- Supabase: account identity and optional job/asset metadata. Never store model binaries or expose a Supabase secret key in the APK.
-- Vercel: web dashboard and preview deployments, not Android video rendering.
-- TinyFish: development research and explicitly requested browser automation; not a dependency in the mobile runtime.
+## Server-driven configuration
 
-## Model sources and licenses
+`GET /api/mobile/config` returns public feature flags and minimum supported app version. Environment variables:
 
-- Qwen conversion: https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct (Apache-2.0)
-- DeepSeek conversion: https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B (MIT)
-- LiteRT-LM Android guide: https://ai.google.dev/edge/litert-lm/android
+- `CLIPVLIP_MIN_APP_VERSION`
+- `CLIPVLIP_MAINTENANCE_MODE`
+- `CLIPVLIP_MAINTENANCE_MESSAGE`
+- `CLIPVLIP_DIRECT_UPDATES`
+- `CLIPVLIP_PLAY_UPDATES`
+
+Never put Supabase service keys, signing credentials, or service-account JSON in this endpoint or the APK.
+
+## Important limitations
+
+Native Kotlin, permissions, SDKs and device integrations require a new signed APK/AAB. Server-driven settings/content can change without reinstalling. Direct APK installation is user-approved by Android, never silent. Google Play in-app updates require Play distribution.
