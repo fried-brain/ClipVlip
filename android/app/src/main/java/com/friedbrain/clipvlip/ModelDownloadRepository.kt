@@ -23,7 +23,6 @@ class ModelDownloadRepository(context: Context) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(30, TimeUnit.MINUTES)
         .retryOnConnectionFailure(true)
         .build()
 
