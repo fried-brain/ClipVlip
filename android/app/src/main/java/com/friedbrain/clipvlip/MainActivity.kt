@@ -203,8 +203,8 @@ private fun ModelCard(
             Spacer(Modifier.height(12.dp))
             Text(model.description, color = Color(0xFFABB3C5), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(12.dp))
-            Text("License: \${model.license}", style = MaterialTheme.typography.labelSmall, color = Color(0xFFABB3C5))
-            Text("Runtime: \${model.minimumRuntime}", style = MaterialTheme.typography.labelSmall, color = Color(0xFFABB3C5))
+            Text("License: ${model.license}", style = MaterialTheme.typography.labelSmall, color = Color(0xFFABB3C5))
+            Text("Runtime: ${model.minimumRuntime}", style = MaterialTheme.typography.labelSmall, color = Color(0xFFABB3C5))
             if (downloading) {
                 Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
@@ -212,7 +212,7 @@ private fun ModelCard(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(5.dp))
-                Text("\${(progress * 100).toInt()}% downloaded", color = Color(0xFFABB3C5), style = MaterialTheme.typography.labelSmall)
+                Text("${(progress * 100).toInt()}% downloaded", color = Color(0xFFABB3C5), style = MaterialTheme.typography.labelSmall)
             }
             if (error != null) {
                 Spacer(Modifier.height(10.dp))
