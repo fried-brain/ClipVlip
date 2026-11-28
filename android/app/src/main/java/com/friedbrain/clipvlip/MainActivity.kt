@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,8 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -64,12 +61,17 @@ private fun LaunchScreen(onModels: () -> Unit, onUpdates: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Image(
-            painter = painterResource(R.drawable.clipvlip_logo),
-            contentDescription = "ClipVlip",
-            modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
-            contentScale = ContentScale.Fit
-        )
+        // Keep startup independent of optional bitmap assets. A malformed logo
+        // must never prevent the first screen from rendering.
+        Surface(
+            modifier = Modifier.size(112.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = Color(0xFF241044)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("▶", color = Color(0xFFB66BFF), style = MaterialTheme.typography.displayLarge)
+            }
+        }
         Spacer(Modifier.height(18.dp))
         Text("CLIPVLIP", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = Color.White)
         Text("Your AI video studio", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
