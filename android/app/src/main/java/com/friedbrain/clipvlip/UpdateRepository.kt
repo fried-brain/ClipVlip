@@ -107,7 +107,7 @@ class UpdateRepository(private val context: android.content.Context) {
         lastStatus = "APK verified. Android installer opened for approval."
     }
 
-    fun checkPlayUpdate(activity: Activity, onResult: (Boolean) -> Unit) {
+    fun startPlayUpdate(activity: Activity, requestCode: Int) {\n        val manager = AppUpdateManagerFactory.create(activity)\n        manager.appUpdateInfo.addOnSuccessListener { info ->\n            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {\n                manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, activity, requestCode)\n            } else { lastStatus = "No Play update is available for this installation." }\n        }.addOnFailureListener { lastStatus = "Play update unavailable: ${it.message}" }\n    }\n\n    fun checkPlayUpdate(activity: Activity, onResult: (Boolean) -> Unit) {
         AppUpdateManagerFactory.create(activity).appUpdateInfo
             .addOnSuccessListener { info ->
                 val available = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&

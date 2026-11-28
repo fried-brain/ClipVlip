@@ -26,6 +26,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,7 +68,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel) {
+private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel) {\n    val activity = LocalContext.current as ComponentActivity\n    val updateRepository = remember { UpdateRepository(activity) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -202,6 +211,69 @@ private fun ModelCard(
                     Button(onClick = onRemove) { Text("Remove") }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun UpdateCenterCard(activity: ComponentActivity, repository: UpdateRepository) {
+    val scope = rememberCoroutineScope()
+    var channel by remember { mutableStateOf(repository.selectedChannel()) }
+    var status by remember { mutableStateOf(repository.lastStatus) }
+    var release by remember { mutableStateOf<DirectRelease?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF20243A))
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("APP UPDATES", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+            Text("Choose how ClipVlip receives native app updates.")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { channel = UpdateChannel.AUTOMATIC; repository.setChannel(channel) }) { Text("Auto") }
+                Button(onClick = { channel = UpdateChannel.DIRECT; repository.setChannel(channel) }) { Text("Direct") }
+                Button(onClick = { channel = UpdateChannel.GOOGLE_PLAY; repository.setChannel(channel) }) { Text("Play") }
+            }
+            Text("Selected: ${channel.name.replace('_', ' ')}", style = MaterialTheme.typography.labelMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(enabled = !busy, onClick = {
+                    busy = true
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            runCatching { repository.checkDirectRelease() }
+                        }
+                        release = result.getOrNull()
+                        status = result.fold(
+                            { if (it == null) repository.lastStatus else "Release ${it.tag} is available." },
+                            { "Direct update check failed: ${it.message}" }
+                        )
+                        busy = false
+                    }
+                }) { Text("Check APK") }
+                Button(enabled = !busy, onClick = {
+                    repository.checkPlayUpdate(activity) { available ->
+                        status = repository.lastStatus
+                        if (available) repository.startPlayUpdate(activity, 4102)
+                    }
+                }) { Text("Check Play") }
+            }
+            if (release != null) {
+                Button(enabled = !busy, onClick = {
+                    val selected = release ?: return@Button
+                    busy = true
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            runCatching { repository.downloadAndInstall(activity, selected) }
+                        }
+                        status = result.fold({ repository.lastStatus }, { "APK update failed: ${it.message}" })
+                        busy = false
+                    }
+                }) { Text("Download and install ${release!!.tag}") }
+            }
+            if (busy) CircularProgressIndicator()
+            Text(status, color = Color(0xFFABB3C5), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
