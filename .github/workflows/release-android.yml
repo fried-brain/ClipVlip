@@ -30,8 +30,8 @@ jobs:
             [[ "$part" =~ ^[0-9]+$ ]] || { echo "Release tag must be vMAJOR.MINOR.PATCH" >&2; exit 1; }
           done
           (( major <= 2100 && minor <= 999 && patch <= 999 )) || { echo "Release version exceeds supported Android version-code range" >&2; exit 1; }
-          code=$((major * 1000000 + minor * 1000 + patch))
-          (( code > 0 )) || { echo "Release version code must be positive" >&2; exit 1; }
+          code=$((major * 1000000 + minor * 1000 + patch + 1))
+          (( code > 0 && code <= 2100000000 )) || { echo "Release version code is outside Android supported range" >&2; exit 1; }
           echo "version_code=$code" >> "$GITHUB_OUTPUT"
       - name: Build signed APK and AAB
         env:
