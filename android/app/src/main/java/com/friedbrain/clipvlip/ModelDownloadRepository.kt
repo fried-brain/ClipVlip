@@ -56,6 +56,7 @@ class ModelDownloadRepository(context: Context) {
             .header("User-Agent", "ClipVlip-Android/0.1")
             .build()
 
+        val coroutineContext = currentCoroutineContext()
         suspendCancellableCoroutine { continuation ->
             val call = client.newCall(request)
             continuation.invokeOnCancellation { call.cancel() }
