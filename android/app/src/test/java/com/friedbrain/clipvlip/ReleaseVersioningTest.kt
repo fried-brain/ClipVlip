@@ -6,6 +6,20 @@ import org.junit.Test
 
 class ReleaseVersioningTest {
     @Test
+    fun semanticVersionCodesIncreaseInSemanticOrder() {
+        val v151 = ReleaseVersioning.androidVersionCode(1, 5, 1)
+        val v200 = ReleaseVersioning.androidVersionCode(2, 0, 0)
+        assertTrue(v200 > v151)
+        assertTrue(ReleaseVersioning.androidVersionCode(2, 0, 1) >
+            ReleaseVersioning.androidVersionCode(2, 0, 0))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsOutOfRangePatchVersion() {
+        ReleaseVersioning.androidVersionCode(1, 0, 1000)
+    }
+
+    @Test
     fun rejectsReleaseWithVersionCodeAlreadyInstalled() {
         assertFalse(ReleaseVersioning.isNewer(42, 42, "v9.9.9", "0.1.0"))
     }
