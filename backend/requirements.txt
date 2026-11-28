@@ -3,7 +3,7 @@ uvicorn[standard]==0.34.2
 python-multipart==0.0.20
 pydantic==2.11.4
 httpx==0.28.1
-python-dotenv==1.1.0
+python-dotenv==1.2.2
 yt-dlp==2025.5.22
 faster-whisper==1.1.1
 opencv-python-headless==4.11.0.86
