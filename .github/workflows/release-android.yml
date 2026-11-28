@@ -39,7 +39,17 @@ jobs:
           (( major <= 2099 && minor <= 999 && patch <= 999 )) || { echo "Release version exceeds supported Android version-code range" >&2; exit 1; }
           code=$((major * 1000000 + minor * 1000 + patch + 1))
           (( code > 0 && code <= 2100000000 )) || { echo "Release version code is outside Android supported range" >&2; exit 1; }
-          latest_tag="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isDraft,isPrerelease | jq -r --arg current "$GITHUB_REF_NAME" '[.[] | select(.isDraft == false and .isPrerelease == false and .tagName != $current) | .tagName] | .[0] // empty')"
+          latest_tag="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -s -r --arg current "$GITHUB_REF_NAME" '
+            [ .[][] 
+              | select(.draft == false and .prerelease == false and .tag_name != $current)
+              | .tag_name
+              | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+              | . as $tag
+              | (capture("^v(?<major>[0-9]+)\\.(?<minor>[0-9]+)\\.(?<patch>[0-9]+)$")) as $version
+              | {tag: $tag, major: ($version.major | tonumber), minor: ($version.minor | tonumber), patch: ($version.patch | tonumber)}
+            ]
+            | if length == 0 then empty else max_by([.major, .minor, .patch]).tag end
+          ')"
           if [[ -n "$latest_tag" ]]; then
             latest="${latest_tag#v}"
             [[ "$latest" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "Latest published release tag is not semantic: $latest_tag" >&2; exit 1; }
