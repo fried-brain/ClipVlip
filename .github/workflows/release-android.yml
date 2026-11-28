@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: "17" }
       - uses: gradle/actions/setup-gradle@v4
@@ -19,19 +21,27 @@ jobs:
         run: |
           test -n "$KEYSTORE_B64" || (echo "Configure Android signing secrets before tagging a release." && exit 1)
           echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/clipvlip.jks"
-      - name: Derive deterministic Android version code
+      - name: Derive and validate monotonic Android version code
         id: version
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          version="${version%%-*}"
-          IFS='.' read -r major minor patch <<< "$version"
-          for part in "$major" "$minor" "$patch"; do
-            [[ "$part" =~ ^[0-9]+$ ]] || { echo "Release tag must be vMAJOR.MINOR.PATCH" >&2; exit 1; }
-          done
-          (( major <= 2100 && minor <= 999 && patch <= 999 )) || { echo "Release version exceeds supported Android version-code range" >&2; exit 1; }
+          [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "Release tag must be exactly vMAJOR.MINOR.PATCH" >&2; exit 1; }
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          patch="${BASH_REMATCH[3]}"
+          (( major <= 2099 && minor <= 999 && patch <= 999 )) || { echo "Release version exceeds supported Android version-code range" >&2; exit 1; }
           code=$((major * 1000000 + minor * 1000 + patch + 1))
           (( code > 0 && code <= 2100000000 )) || { echo "Release version code is outside Android supported range" >&2; exit 1; }
+          latest_tag="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isDraft,isPrerelease --jq '[.[] | select(.isDraft == false and .isPrerelease == false) | .tagName] | .[0] // empty')"
+          if [[ -n "$latest_tag" ]]; then
+            latest="${latest_tag#v}"
+            [[ "$latest" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "Latest published release tag is not semantic: $latest_tag" >&2; exit 1; }
+            old_code=$(("${BASH_REMATCH[1]}" * 1000000 + "${BASH_REMATCH[2]}" * 1000 + "${BASH_REMATCH[3]}" + 1))
+            (( code > old_code )) || { echo "Refusing non-monotonic release $GITHUB_REF_NAME ($code); latest release $latest_tag has version code $old_code" >&2; exit 1; }
+          fi
           echo "version_code=$code" >> "$GITHUB_OUTPUT"
       - name: Build signed APK and AAB
         env:
