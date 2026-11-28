@@ -1,6 +1,7 @@
 package com.friedbrain.clipvlip
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
@@ -47,23 +48,64 @@ import androidx.compose.ui.unit.dp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val modelViewModel = ViewModelProvider(this)[ModelLibraryViewModel::class.java]
-        setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = Color(0xFF8B7CFF),
-                    secondary = Color(0xFF45D5E8),
-                    background = Color(0xFF090B12),
-                    surface = Color(0xFF151927)
-                )
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+        try {
+            val modelViewModel = ViewModelProvider(this)[ModelLibraryViewModel::class.java]
+            setContent {
+                MaterialTheme(
+                    colorScheme = darkColorScheme(
+                        primary = Color(0xFF8B7CFF),
+                        secondary = Color(0xFF45D5E8),
+                        background = Color(0xFF090B12),
+                        surface = Color(0xFF151927)
+                    )
                 ) {
-                    ModelLibraryScreen(modelViewModel)
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        ModelLibraryScreen(modelViewModel)
+                    }
                 }
             }
+        } catch (error: Throwable) {
+            Log.e("ClipVlipStartup", "Startup failed before the main screen was created", error)
+            showStartupFailure(error)
+        }
+    }
+
+    private fun showStartupFailure(error: Throwable) {
+        runCatching {
+            setContent {
+                MaterialTheme(colorScheme = darkColorScheme()) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = Color(0xFF090B12)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(24.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                "ClipVlip couldn't start",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = Color.White
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                error.localizedMessage ?: error.javaClass.simpleName,
+                                color = Color(0xFFFF8A8A)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "Startup diagnostics have been recorded. Please share this screen with ClipVlip support.",
+                                color = Color(0xFFABB3C5)
+                            )
+                        }
+                    }
+                }
+            }
+        }.onFailure { fallbackError ->
+            Log.e("ClipVlipStartup", "Could not render startup diagnostics", fallbackError)
         }
     }
 }
