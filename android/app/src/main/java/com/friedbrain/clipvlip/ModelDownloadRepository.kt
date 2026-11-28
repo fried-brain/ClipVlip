@@ -39,10 +39,10 @@ class ModelDownloadRepository(context: Context) {
 
         val availableBytes = StatFs(modelDirectory.absolutePath).availableBytes
         if (availableBytes < model.sizeBytes + 100_000_000L) {
-            throw IllegalStateException("Not enough free storage. Free at least \${model.sizeLabel} plus temporary download space.")
+            throw IllegalStateException("Not enough free storage. Free at least ${model.sizeLabel} plus temporary download space.")
         }
 
-        val partial = File(modelDirectory, "\${model.fileName}.part")
+        val partial = File(modelDirectory, "${model.fileName}.part")
         partial.delete()
         val request = Request.Builder()
             .url(model.downloadUrl)
@@ -51,7 +51,7 @@ class ModelDownloadRepository(context: Context) {
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IllegalStateException("Model download failed: HTTP \${response.code}")
+                throw IllegalStateException("Model download failed: HTTP ${response.code}")
             }
             val body = response.body ?: throw IllegalStateException("The model server returned an empty response.")
             val totalBytes = body.contentLength().takeIf { it > 0 } ?: model.sizeBytes
