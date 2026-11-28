@@ -19,10 +19,24 @@ jobs:
         run: |
           test -n "$KEYSTORE_B64" || (echo "Configure Android signing secrets before tagging a release." && exit 1)
           echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/clipvlip.jks"
+      - name: Derive deterministic Android version code
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          version="${version%%-*}"
+          IFS='.' read -r major minor patch <<< "$version"
+          for part in "$major" "$minor" "$patch"; do
+            [[ "$part" =~ ^[0-9]+$ ]] || { echo "Release tag must be vMAJOR.MINOR.PATCH" >&2; exit 1; }
+          done
+          (( major <= 2100 && minor <= 999 && patch <= 999 )) || { echo "Release version exceeds supported Android version-code range" >&2; exit 1; }
+          code=$((major * 1000000 + minor * 1000 + patch))
+          (( code > 0 )) || { echo "Release version code must be positive" >&2; exit 1; }
+          echo "version_code=$code" >> "$GITHUB_OUTPUT"
       - name: Build signed APK and AAB
         env:
           ORG_GRADLE_PROJECT_VERSION_NAME: ${{ github.ref_name }}
-          ORG_GRADLE_PROJECT_VERSION_CODE: ${{ github.run_number }}
+          ORG_GRADLE_PROJECT_VERSION_CODE: ${{ steps.version.outputs.version_code }}
           KEYSTORE_PATH: ${{ runner.temp }}/clipvlip.jks
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -32,7 +46,7 @@ jobs:
         with:
           generate_release_notes: true
           append_body: true
-          body: "ClipVlip-Version-Code: ${{ github.run_number }}"
+          body: "ClipVlip-Version-Code: ${{ steps.version.outputs.version_code }}"
           files: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
