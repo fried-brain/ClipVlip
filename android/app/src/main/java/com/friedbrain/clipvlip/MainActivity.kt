@@ -58,26 +58,16 @@ class MainActivity : ComponentActivity() {
                             onUpdates = { screen = AppScreen.UPDATES },
                             onSettings = { screen = AppScreen.SETTINGS }
                         )
-                        AppScreen.CREATE -> CreateProjectScreen(onBack = { screen = AppScreen.HOME })
-                        AppScreen.LIBRARY -> SimpleInfoScreen(
-                            title = "My Projects",
-                            heading = "YOUR VIDEO PROJECTS",
-                            message = "Your processed videos and saved clips will appear here. Project history will become available when the secure processing API is connected.",
+                        AppScreen.CREATE -> CreateProjectScreen(workerApi = remember { WorkerApi(this@MainActivity) }, onBack = { screen = AppScreen.HOME })
+                        AppScreen.LIBRARY -> WorkerProjectsScreen(
+                            workerApi = remember { WorkerApi(this@MainActivity) },
                             onBack = { screen = AppScreen.HOME }
                         )
-                        AppScreen.SETTINGS -> SimpleInfoScreen(
-                            title = "Settings",
-                            heading = "APP SETTINGS",
-                            message = "Manage app preferences, storage and service connections. Secure account and backend connection settings are being prepared.",
+                        AppScreen.SETTINGS -> WorkerSettingsScreen(
+                            workerApi = remember { WorkerApi(this@MainActivity) },
                             onBack = { screen = AppScreen.HOME },
-                            extra = {
-                                OutlinedButton(onClick = { screen = AppScreen.UPDATES }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("App updates")
-                                }
-                                OutlinedButton(onClick = { screen = AppScreen.MODELS }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("AI model library")
-                                }
-                            }
+                            onUpdates = { screen = AppScreen.UPDATES },
+                            onModels = { screen = AppScreen.MODELS }
                         )
                         AppScreen.MODELS -> {
                             val modelVm = remember {
@@ -174,7 +164,7 @@ private fun WorkspaceCard(title: String, subtitle: String, modifier: Modifier = 
 }
 
 @Composable
-private fun CreateProjectScreen(onBack: () -> Unit) {
+private fun CreateProjectScreen(workerApi: WorkerApi, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var selectedVideo by rememberSaveable { mutableStateOf<Uri?>(null) }
     var videoName by rememberSaveable { mutableStateOf("") }
@@ -185,7 +175,9 @@ private fun CreateProjectScreen(onBack: () -> Unit) {
     var aspectRatio by rememberSaveable { mutableStateOf("9:16") }
     var captions by rememberSaveable { mutableStateOf(true) }
     var captionStyle by rememberSaveable { mutableStateOf("bold") }
-    var showConnectionNotice by rememberSaveable { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var submissionMessage by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             selectedVideo = uri
@@ -254,20 +246,126 @@ private fun CreateProjectScreen(onBack: () -> Unit) {
                 }
             }
             Button(
-                onClick = { showConnectionNotice = true },
-                enabled = selectedVideo != null || sourceUrl.trim().startsWith("https://") || sourceUrl.trim().startsWith("http://"),
+                onClick = {
+                    isSubmitting = true
+                    submissionMessage = "Uploading video and creating your project…"
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            runCatching {
+                                workerApi.createTask(
+                                    context = context,
+                                    sourceUri = selectedVideo,
+                                    sourceUrl = sourceUrl.trim(),
+                                    clipCount = clipCount,
+                                    minDuration = minDuration,
+                                    maxDuration = maxDuration,
+                                    aspectRatio = aspectRatio,
+                                    captions = captions,
+                                    captionStyle = captionStyle
+                                )
+                            }
+                        }
+                        submissionMessage = result.fold(
+                            { "Project queued successfully. Project ID: $it" },
+                            { "Could not start project: ${it.message}" }
+                        )
+                        isSubmitting = false
+                    }
+                },
+                enabled = !isSubmitting && (selectedVideo != null || sourceUrl.trim().startsWith("https://")),
                 modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) { Text("Continue to AI processing") }
-            if (showConnectionNotice) {
+            ) { Text(if (isSubmitting) "Uploading…" else "Continue to AI processing") }
+            if (isSubmitting) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (submissionMessage.isNotBlank()) {
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF211833))) {
-                    Text(
-                        "Your source and settings are ready. Secure Android-to-backend authentication must be completed before uploading or starting cloud processing. No video has been uploaded.",
-                        Modifier.padding(14.dp),
-                        color = Color.White
-                    )
+                    Text(submissionMessage, Modifier.padding(14.dp), color = Color.White)
                 }
             }
             Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+ 
+@Composable
+private fun WorkerSettingsScreen(
+    workerApi: WorkerApi,
+    onBack: () -> Unit,
+    onUpdates: () -> Unit,
+    onModels: () -> Unit
+) {
+    var url by rememberSaveable { mutableStateOf(workerApi.baseUrl) }
+    var key by rememberSaveable { mutableStateOf(workerApi.accessKey) }
+    var status by rememberSaveable { mutableStateOf("") }
+    Column(Modifier.fillMaxSize()) {
+        ScreenTopBar("Settings", onBack)
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("WORKER CONNECTION", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Connect the Android app to your private ClipVlip processing worker. Use its HTTPS URL and the worker access key configured in the hosting dashboard.", color = Muted)
+            OutlinedTextField(value = url, onValueChange = { url = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Worker HTTPS URL") }, placeholder = { Text("https://your-worker.onrender.com") }, singleLine = true)
+            OutlinedTextField(value = key, onValueChange = { key = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Worker access key") }, singleLine = true)
+            Button(onClick = {
+                if (!url.startsWith("https://") || key.isBlank()) {
+                    status = "Enter a valid HTTPS URL and access key."
+                } else {
+                    workerApi.baseUrl = url
+                    workerApi.accessKey = key
+                    status = "Worker connection settings saved on this device."
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Save connection") }
+            Text(status, color = Muted)
+            Divider()
+            OutlinedButton(onClick = onUpdates, modifier = Modifier.fillMaxWidth()) { Text("App updates") }
+            OutlinedButton(onClick = onModels, modifier = Modifier.fillMaxWidth()) { Text("AI model library") }
+        }
+    }
+}
+
+@Composable
+private fun WorkerProjectsScreen(workerApi: WorkerApi, onBack: () -> Unit) {
+    var tasks by remember { mutableStateOf<List<WorkerTask>>(emptyList()) }
+    var status by remember { mutableStateOf("Loading projects…") }
+    var refreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun refresh() {
+        refreshing = true
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { workerApi.listTasks() } }
+            tasks = result.getOrDefault(emptyList())
+            status = result.fold({ if (it.isEmpty()) "No projects yet. Create your first video project." else "" }, { "Could not load projects: ${it.message}" })
+            refreshing = false
+        }
+    }
+    LaunchedEffect(Unit) { refresh() }
+    Column(Modifier.fillMaxSize()) {
+        ScreenTopBar("My Projects", onBack)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("YOUR VIDEO PROJECTS", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { refresh() }, enabled = !refreshing) { Text("Refresh") }
+        }
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (refreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (status.isNotBlank()) Text(status, color = Muted)
+            tasks.forEach { task ->
+                Card(colors = CardDefaults.cardColors(containerColor = Panel), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Project ${task.id.take(10)}", fontWeight = FontWeight.Bold)
+                        Text(task.status.uppercase(), color = MaterialTheme.colorScheme.secondary)
+                        Text(task.message, color = Muted)
+                        if (task.status == "processing" || task.status == "queued") {
+                            LinearProgressIndicator(progress = { (task.progress.coerceIn(0, 100) / 100f) }, Modifier.fillMaxWidth())
+                        }
+                        task.error?.let { Text(it, color = Color(0xFFFF8A8A)) }
+                        if (task.clips.length() > 0) Text("${task.clips.length()} clips generated. Clip playback and export controls are the next integration step.", color = Muted)
+                    }
+                }
+            }
         }
     }
 }
