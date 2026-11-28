@@ -38,7 +38,7 @@ app.include_router(mobile_router)
 async def protect_cloud_job_api(request, call_next):
     path = request.url.path
     protected = path == "/api/tasks" or path.startswith("/api/tasks/")
-    if STORE.enabled and protected and request.method != "OPTIONS":
+    if protected and request.method != "OPTIONS":
         expected = os.getenv("CLIPVLIP_ACCESS_KEY", "")
         supplied = request.headers.get("x-clipvlip-key", "")
         if not expected:
@@ -382,7 +382,7 @@ def process(task_id: str, settings: dict):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "name": "ClipVlip", "auth": "disabled", "billing": "disabled"}
+    return {"status": "ok", "name": "ClipVlip", "auth": "required_for_tasks", "billing": "disabled"}
 
 
 @app.post("/api/tasks")
