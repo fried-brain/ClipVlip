@@ -184,6 +184,56 @@ class UpdateRepository(private val context: android.content.Context) {
             }
     }
 
+    /**
+     * Automatic policy: prefer Play for Play-installed builds; if Play has no
+     * eligible update, let the caller fall back to the signed direct channel.
+     * If a flexible download is already complete, finish it rather than
+     * starting another update flow.
+     */
+    fun checkAndStartAutomaticPlayUpdate(
+        activity: Activity,
+        onPlayHandled: (Boolean) -> Unit
+    ) {
+        val manager = getPlayManager(activity.applicationContext)
+        manager.appUpdateInfo
+            .addOnSuccessListener { info ->
+                when {
+                    info.installStatus() == InstallStatus.DOWNLOADED -> {
+                        lastStatus = "Google Play update downloaded. Completing installation."
+                        completePlayUpdate { onPlayHandled(true) }
+                    }
+                    info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
+                        lastStatus = "Resuming Google Play update."
+                        manager.startUpdateFlowForResult(
+                            info, AppUpdateType.FLEXIBLE, activity, PLAY_UPDATE_REQUEST_CODE
+                        )
+                        onPlayHandled(true)
+                    }
+                    info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
+                        info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> {
+                        lastStatus = "Google Play update available. Starting Play update."
+                        manager.startUpdateFlowForResult(
+                            info, AppUpdateType.FLEXIBLE, activity, PLAY_UPDATE_REQUEST_CODE
+                        ).addOnSuccessListener { started ->
+                            if (!started) lastStatus = "Play update flow was not started."
+                            onPlayHandled(started)
+                        }.addOnFailureListener { error ->
+                            lastStatus = "Could not start Play update: ${error.message}"
+                            onPlayHandled(false)
+                        }
+                    }
+                    else -> {
+                        lastStatus = "No eligible Play update. Direct update may be checked."
+                        onPlayHandled(false)
+                    }
+                }
+            }
+            .addOnFailureListener { error ->
+                lastStatus = "Play update check unavailable: ${error.message}"
+                onPlayHandled(false)
+            }
+    }
+
     fun resumePlayUpdate(activity: Activity) {
         val manager = getPlayManager(activity)
         manager.appUpdateInfo
