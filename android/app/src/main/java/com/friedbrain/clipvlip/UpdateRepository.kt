@@ -88,8 +88,9 @@ class UpdateRepository(private val context: android.content.Context) {
             val tag = release.optString("tag_name")
             val publishedVersionCode = Regex("(?m)^ClipVlip-Version-Code:\\s*(\\d+)\\s*$")
                 .find(release.optString("body"))?.groupValues?.get(1)?.toIntOrNull()
-            val isNewer = publishedVersionCode?.let { it > BuildConfig.VERSION_CODE }
-                ?: (compareVersions(tag, BuildConfig.VERSION_NAME) > 0)
+            val isNewer = ReleaseVersioning.isNewer(
+                publishedVersionCode, BuildConfig.VERSION_CODE, tag, BuildConfig.VERSION_NAME
+            )
             if (!isNewer) {
                 lastStatus = "ClipVlip is already up to date."
                 return null
@@ -113,17 +114,6 @@ class UpdateRepository(private val context: android.content.Context) {
         }
     }
 
-    private fun compareVersions(left: String, right: String): Int {
-        fun parts(value: String) = value.removePrefix("v").substringBefore("-")
-            .split(".").map { it.toIntOrNull() ?: 0 }
-        val a = parts(left)
-        val b = parts(right)
-        for (index in 0 until maxOf(a.size, b.size)) {
-            val comparison = (a.getOrElse(index) { 0 }).compareTo(b.getOrElse(index) { 0 })
-            if (comparison != 0) return comparison
-        }
-        return 0
-    }
 
     fun downloadAndInstall(activity: Activity, release: DirectRelease) {
         if (!activity.packageManager.canRequestPackageInstalls()) {
