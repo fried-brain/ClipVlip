@@ -86,7 +86,11 @@ class UpdateRepository(private val context: android.content.Context) {
             check(response.isSuccessful) { "Release check HTTP ${response.code}" }
             val release = JSONObject(response.body?.string().orEmpty())
             val tag = release.optString("tag_name")
-            if (compareVersions(tag, BuildConfig.VERSION_NAME) <= 0) {
+            val publishedVersionCode = Regex("(?m)^ClipVlip-Version-Code:\\s*(\\d+)\\s*$")
+                .find(release.optString("body"))?.groupValues?.get(1)?.toIntOrNull()
+            val isNewer = publishedVersionCode?.let { it > BuildConfig.VERSION_CODE }
+                ?: (compareVersions(tag, BuildConfig.VERSION_NAME) > 0)
+            if (!isNewer) {
                 lastStatus = "ClipVlip is already up to date."
                 return null
             }
@@ -157,15 +161,31 @@ class UpdateRepository(private val context: android.content.Context) {
     }
 
     fun checkPlayUpdate(activity: Activity, onResult: (Boolean) -> Unit) {
-        val manager = AppUpdateManagerFactory.create(activity)
-        playManager = manager
-        manager.registerListener(playListener)
+        val manager = getPlayManager(activity)
         manager.appUpdateInfo
             .addOnSuccessListener { info ->
-                val available = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
-                    info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
-                lastStatus = if (available) "Google Play update available." else "No Play update available."
-                onResult(available)
+                when {
+                    info.installStatus() == InstallStatus.DOWNLOADED -> {
+                        lastStatus = "Google Play update downloaded. Install it to finish updating."
+                        onResult(false)
+                    }
+                    info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
+                        lastStatus = "Resuming Google Play update."
+                        manager.startUpdateFlowForResult(
+                            info, AppUpdateType.FLEXIBLE, activity, PLAY_UPDATE_REQUEST_CODE
+                        )
+                        onResult(false)
+                    }
+                    info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
+                        info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> {
+                        lastStatus = "Google Play update available."
+                        onResult(true)
+                    }
+                    else -> {
+                        lastStatus = "No Play update available."
+                        onResult(false)
+                    }
+                }
             }
             .addOnFailureListener { error ->
                 lastStatus = "Play update check unavailable: ${error.message}"
@@ -173,11 +193,38 @@ class UpdateRepository(private val context: android.content.Context) {
             }
     }
 
-    fun startPlayUpdate(activity: Activity, requestCode: Int) {
-        val manager = playManager ?: AppUpdateManagerFactory.create(activity).also {
-            playManager = it
-            it.registerListener(playListener)
+    fun resumePlayUpdate(activity: Activity) {
+        val manager = getPlayManager(activity)
+        manager.appUpdateInfo
+            .addOnSuccessListener { info ->
+                if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                    lastStatus = "Google Play update downloaded. Install it to finish updating."
+                } else if (
+                    info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
+                ) {
+                    manager.startUpdateFlowForResult(
+                        info, AppUpdateType.FLEXIBLE, activity, PLAY_UPDATE_REQUEST_CODE
+                    )
+                }
+            }
+            .addOnFailureListener {
+                lastStatus = "Could not resume Google Play update: ${it.message}"
+            }
+    }
+
+    private fun getPlayManager(activity: Activity): AppUpdateManager {
+        return playManager ?: AppUpdateManagerFactory.create(activity).also { manager ->
+            playManager = manager
+            manager.registerListener(playListener)
         }
+    }
+
+    companion object {
+        const val PLAY_UPDATE_REQUEST_CODE = 4102
+    }
+
+    fun startPlayUpdate(activity: Activity, requestCode: Int) {
+        val manager = getPlayManager(activity)
         manager.appUpdateInfo.addOnSuccessListener { info ->
             if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
                 info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
