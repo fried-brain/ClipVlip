@@ -212,15 +212,11 @@ class UpdateRepository(private val context: android.content.Context) {
                     info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
                         info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> {
                         lastStatus = "Google Play update available. Starting Play update."
-                        manager.startUpdateFlowForResult(
+                        val started = manager.startUpdateFlowForResult(
                             info, AppUpdateType.FLEXIBLE, activity, PLAY_UPDATE_REQUEST_CODE
-                        ).addOnSuccessListener { started ->
-                            if (!started) lastStatus = "Play update flow was not started."
-                            onPlayHandled(started)
-                        }.addOnFailureListener { error ->
-                            lastStatus = "Could not start Play update: ${error.message}"
-                            onPlayHandled(false)
-                        }
+                        )
+                        if (!started) lastStatus = "Play update flow was not started."
+                        onPlayHandled(started)
                     }
                     else -> {
                         lastStatus = "No eligible Play update. Direct update may be checked."
@@ -265,7 +261,7 @@ class UpdateRepository(private val context: android.content.Context) {
     }
 
     fun startPlayUpdate(activity: Activity, requestCode: Int) {
-        val manager = getPlayManager(activity)
+        val manager = getPlayManager(activity.applicationContext)
         manager.appUpdateInfo.addOnSuccessListener { info ->
             when {
                 info.installStatus() == InstallStatus.DOWNLOADED ->
