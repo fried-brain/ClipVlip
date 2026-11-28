@@ -26,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -223,6 +224,14 @@ private fun UpdateCenterCard(activity: ComponentActivity, repository: UpdateRepo
     var status by remember { mutableStateOf(repository.lastStatus) }
     var release by remember { mutableStateOf<DirectRelease?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var remoteConfig by remember { mutableStateOf<MobileRemoteConfig?>(null) }
+    LaunchedEffect(Unit) {
+        val fetched = withContext(Dispatchers.IO) { runCatching { repository.fetchRemoteConfig() }.getOrNull() }
+        remoteConfig = fetched
+        if (fetched != null && fetched.maintenance) {
+            status = fetched.maintenanceMessage.ifBlank { "ClipVlip is under maintenance." }
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -232,6 +241,12 @@ private fun UpdateCenterCard(activity: ComponentActivity, repository: UpdateRepo
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("APP UPDATES", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
             Text("Choose how ClipVlip receives native app updates.")
+            Text(
+                remoteConfig?.let { if (it.maintenance) "Maintenance mode" else "Server configuration connected" }
+                    ?: "Using local defaults until server configuration is reachable.",
+                color = Color(0xFFABB3C5),
+                style = MaterialTheme.typography.bodySmall
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { channel = UpdateChannel.AUTOMATIC; repository.setChannel(channel) }) { Text("Auto") }
                 Button(onClick = { channel = UpdateChannel.DIRECT; repository.setChannel(channel) }) { Text("Direct") }

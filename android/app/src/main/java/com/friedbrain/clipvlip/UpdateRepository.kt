@@ -91,7 +91,7 @@ class UpdateRepository(private val context: android.content.Context) {
         val request = Request.Builder().url(release.downloadUrl).build()
         http.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "APK download HTTP ${response.code}" }
-            response.body?.byteStream()?.use { input -> part.outputStream().use(input::copyTo) }
+            response.body?.byteStream()?.use { input -> part.outputStream().use { output -> input.copyTo(output) } }
                 ?: error("APK response was empty")
         }
         val digest = MessageDigest.getInstance("SHA-256").digest(part.readBytes())
