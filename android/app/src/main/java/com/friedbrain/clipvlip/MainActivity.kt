@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.foundation.Image
@@ -14,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,7 +44,8 @@ class MainActivity : ComponentActivity() {
                 background = AppBackground,
                 surface = Panel
             )) {
-                var screen by remember { mutableStateOf(AppScreen.HOME) }
+                var screen by rememberSaveable { mutableStateOf(AppScreen.HOME) }
+                BackHandler(enabled = screen != AppScreen.HOME) { screen = AppScreen.HOME }
                 Surface(
                     Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
                     color = AppBackground
@@ -173,16 +176,16 @@ private fun WorkspaceCard(title: String, subtitle: String, modifier: Modifier = 
 @Composable
 private fun CreateProjectScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var selectedVideo by remember { mutableStateOf<Uri?>(null) }
-    var videoName by remember { mutableStateOf("") }
-    var sourceUrl by remember { mutableStateOf("") }
-    var clipCount by remember { mutableIntStateOf(5) }
-    var minDuration by remember { mutableIntStateOf(20) }
-    var maxDuration by remember { mutableIntStateOf(60) }
-    var aspectRatio by remember { mutableStateOf("9:16") }
-    var captions by remember { mutableStateOf(true) }
-    var captionStyle by remember { mutableStateOf("bold") }
-    var showConnectionNotice by remember { mutableStateOf(false) }
+    var selectedVideo by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var videoName by rememberSaveable { mutableStateOf("") }
+    var sourceUrl by rememberSaveable { mutableStateOf("") }
+    var clipCount by rememberSaveable { mutableIntStateOf(5) }
+    var minDuration by rememberSaveable { mutableIntStateOf(20) }
+    var maxDuration by rememberSaveable { mutableIntStateOf(60) }
+    var aspectRatio by rememberSaveable { mutableStateOf("9:16") }
+    var captions by rememberSaveable { mutableStateOf(true) }
+    var captionStyle by rememberSaveable { mutableStateOf("bold") }
+    var showConnectionNotice by rememberSaveable { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             selectedVideo = uri
@@ -344,6 +347,10 @@ private fun UpdateScreen(activity: ComponentActivity, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var channel by remember { mutableStateOf(repository.selectedChannel()) }
     var status by remember { mutableStateOf(repository.lastStatus) }
+    DisposableEffect(repository) {
+        repository.onStatusChanged = { status = it }
+        onDispose { repository.onStatusChanged = null }
+    }
     var release by remember { mutableStateOf<DirectRelease?>(null) }
     var busy by remember { mutableStateOf(false) }
     var config by remember { mutableStateOf(MobileRemoteConfig()) }
