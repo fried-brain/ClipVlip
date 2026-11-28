@@ -1,10 +1,9 @@
 package com.friedbrain.clipvlip
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.ViewModelProvider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,21 +25,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val modelViewModel = ViewModelProvider(this)[ModelLibraryViewModel::class.java]
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
@@ -54,7 +48,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ModelLibraryScreen()
+                    ModelLibraryScreen(modelViewModel)
                 }
             }
         }
@@ -62,22 +56,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ModelLibraryScreen() {
-    val context = LocalContext.current
-    val repository = remember { ModelDownloadRepository(context.applicationContext) }
-    val scope = rememberCoroutineScope()
-    val mainHandler = remember { Handler(Looper.getMainLooper()) }
-    val installed = remember { mutableStateMapOf<String, Boolean>() }
-    val progress = remember { mutableStateMapOf<String, Float>() }
-    val busy = remember { mutableStateMapOf<String, Boolean>() }
-    val errors = remember { mutableStateMapOf<String, String>() }
-
-    LaunchedEffect(Unit) {
-        ModelCatalog.models.forEach { model ->
-            installed[model.id] = repository.isInstalled(model)
-        }
-    }
-
+private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -120,34 +99,12 @@ private fun ModelLibraryScreen() {
         items(ModelCatalog.models, key = { it.id }) { model ->
             ModelCard(
                 model = model,
-                installed = installed[model.id] == true,
-                downloading = busy[model.id] == true,
-                progress = progress[model.id] ?: 0f,
-                error = errors[model.id],
-                onDownload = {
-                    errors.remove(model.id)
-                    busy[model.id] = true
-                    progress[model.id] = 0f
-                    scope.launch {
-                        try {
-                            repository.download(model) { downloaded, total ->
-                                mainHandler.post {
-                                    progress[model.id] = (downloaded.toFloat() / total.coerceAtLeast(1L)).coerceIn(0f, 1f)
-                                }
-                            }
-                            installed[model.id] = true
-                        } catch (error: Throwable) {
-                            errors[model.id] = error.message ?: "Download failed. Please try again."
-                        } finally {
-                            busy[model.id] = false
-                        }
-                    }
-                },
-                onRemove = {
-                    repository.delete(model)
-                    installed[model.id] = false
-                    progress.remove(model.id)
-                }
+                installed = viewModel.installed[model.id] == true,
+                downloading = viewModel.busy[model.id] == true,
+                progress = viewModel.progress[model.id] ?: 0f,
+                error = viewModel.errors[model.id],
+                onDownload = { viewModel.download(model) },
+                onRemove = { viewModel.remove(model) }
             )
         }
 
