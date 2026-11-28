@@ -74,6 +74,7 @@ private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel) {\n    val acti
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
+            UpdateCenterCard(activity, updateRepository)
             Spacer(Modifier.height(18.dp))
             Image(
                 painter = painterResource(R.drawable.clipvlip_logo),
