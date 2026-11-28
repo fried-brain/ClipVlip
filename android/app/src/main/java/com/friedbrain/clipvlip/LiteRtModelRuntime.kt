@@ -19,12 +19,12 @@ class LiteRtModelRuntime : Closeable {
             nextEngine.initialize()
             engine = nextEngine
         } catch (initializationError: Throwable) {
-            if (nextEngine.isInitialized()) {
-                try {
+            try {
+                if (nextEngine.isInitialized()) {
                     nextEngine.close()
-                } catch (cleanupError: Throwable) {
-                    initializationError.addSuppressed(cleanupError)
                 }
+            } catch (cleanupError: Throwable) {
+                initializationError.addSuppressed(cleanupError)
             }
             throw initializationError
         }
