@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -62,14 +65,13 @@ private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Spacer(Modifier.height(26.dp))
-            Text(
-                text = "CLIPVLIP",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.secondary,
-                fontWeight = FontWeight.Bold
+            Spacer(Modifier.height(18.dp))
+            Image(
+                painter = painterResource(R.drawable.clipvlip_logo),
+                contentDescription = "ClipVlip logo",
+                modifier = Modifier.fillMaxWidth().height(230.dp),
+                contentScale = ContentScale.Fit
             )
-            Spacer(Modifier.height(8.dp))
             Text(
                 text = "Your local AI studio",
                 style = MaterialTheme.typography.headlineMedium,
