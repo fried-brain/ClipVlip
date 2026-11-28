@@ -203,7 +203,7 @@ class UpdateRepository(private val context: android.content.Context) {
     }
 
     private fun getPlayManager(activity: Activity): AppUpdateManager {
-        return playManager ?: AppUpdateManagerFactory.create(activity).also { manager ->
+        return playManager ?: AppUpdateManagerFactory.create(activity.applicationContext).also { manager ->
             playManager = manager
             manager.registerListener(playListener)
         }
@@ -228,12 +228,21 @@ class UpdateRepository(private val context: android.content.Context) {
         }
     }
 
-    fun completePlayUpdate() {
-        val manager = playManager ?: return
-        manager.completeUpdate().addOnSuccessListener {
-            lastStatus = "Completing Google Play update."
-        }.addOnFailureListener {
-            lastStatus = "Could not complete Play update: ${it.message}"
+    fun completePlayUpdate(onComplete: (String) -> Unit = {}) {
+        val manager = playManager
+        if (manager == null) {
+            lastStatus = "No downloaded Google Play update is waiting."
+            onComplete(lastStatus)
+            return
         }
+        manager.completeUpdate()
+            .addOnSuccessListener {
+                lastStatus = "Google Play update installation has been handed to Android."
+                onComplete(lastStatus)
+            }
+            .addOnFailureListener { error ->
+                lastStatus = "Could not complete Play update: ${error.message}"
+                onComplete(lastStatus)
+            }
     }
 }
