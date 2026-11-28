@@ -6,6 +6,17 @@ package com.friedbrain.clipvlip
  * version tags remain a backwards-compatible fallback for older releases.
  */
 internal object ReleaseVersioning {
+    /**
+     * Encodes semantic versions in lexicographic order for Google Play.
+     * Supported range: major 0..2099, minor/patch 0..999.
+     */
+    fun androidVersionCode(major: Int, minor: Int, patch: Int): Int {
+        require(major in 0..2099) { "major version out of range" }
+        require(minor in 0..999) { "minor version out of range" }
+        require(patch in 0..999) { "patch version out of range" }
+        return major * 1_000_000 + minor * 1_000 + patch + 1
+    }
+
     fun isNewer(
         publishedVersionCode: Int?,
         installedVersionCode: Int,
