@@ -56,12 +56,16 @@ internal object ReleaseVersioning {
         for (index in 0 until minOf(a.prerelease.size, b.prerelease.size)) {
             val x = a.prerelease[index]
             val y = b.prerelease[index]
-            val xn = x.toIntOrNull()
-            val yn = y.toIntOrNull()
+            val xNumeric = x.all(Char::isDigit)
+            val yNumeric = y.all(Char::isDigit)
             val comparison = when {
-                xn != null && yn != null -> xn.compareTo(yn)
-                xn != null -> -1
-                yn != null -> 1
+                xNumeric && yNumeric -> {
+                    // SemVer numeric identifiers are unbounded; length then lexical
+                    // comparison gives exact numeric ordering without integer overflow.
+                    x.length.compareTo(y.length).takeIf { it != 0 } ?: x.compareTo(y)
+                }
+                xNumeric -> -1
+                yNumeric -> 1
                 else -> x.compareTo(y)
             }
             if (comparison != 0) return comparison
