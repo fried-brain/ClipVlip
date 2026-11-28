@@ -30,6 +30,17 @@ class ReleaseVersioningTest {
     }
 
     @Test
+    fun stableReleaseIsNewerThanInstalledPrerelease() {
+        assertTrue(ReleaseVersioning.isNewer(null, 42, "v0.2.0", "0.2.0-rc.1"))
+    }
+
+    @Test
+    fun prereleaseIdentifiersFollowSemanticVersionPrecedence() {
+        assertTrue(ReleaseVersioning.isNewer(null, 42, "v1.0.0-rc.2", "1.0.0-rc.1"))
+        assertFalse(ReleaseVersioning.isNewer(null, 42, "v1.0.0-rc.1", "1.0.0"))
+    }
+
+    @Test
     fun fallsBackToSemanticVersionWhenReleaseHasNoVersionCode() {
         assertTrue(ReleaseVersioning.isNewer(null, 42, "v0.2.0", "0.1.0"))
         assertFalse(ReleaseVersioning.isNewer(null, 42, "v0.1.0", "0.1.0"))
