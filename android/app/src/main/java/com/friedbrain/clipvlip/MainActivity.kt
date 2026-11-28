@@ -69,7 +69,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel) {\n    val activity = LocalContext.current as ComponentActivity\n    val updateRepository = remember { UpdateRepository(activity) }
+private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel) {
+    val activity = LocalContext.current as ComponentActivity
+    val updateRepository = remember { UpdateRepository(activity) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -233,6 +235,37 @@ private fun UpdateCenterCard(activity: ComponentActivity, repository: UpdateRepo
         }
     }
 
+
+    fun checkDirectRelease() {
+        if (remoteConfig?.directUpdates == false) {
+            status = "Direct APK updates are disabled by server settings."
+            busy = false
+            return
+        }
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { repository.checkDirectRelease() } }
+            release = result.getOrNull()
+            status = result.fold(
+                { if (it == null) repository.lastStatus else "Release ${it.tag} is available." },
+                { "Direct update check failed: ${it.message}" }
+            )
+            busy = false
+        }
+    }
+
+    fun checkPlay() {
+        if (remoteConfig?.googlePlayUpdates == false) {
+            status = "Google Play updates are disabled by server settings."
+            busy = false
+            return
+        }
+        repository.checkPlayUpdate(activity) { available ->
+            status = repository.lastStatus
+            if (available) repository.startPlayUpdate(activity, 4102)
+            busy = false
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -253,29 +286,44 @@ private fun UpdateCenterCard(activity: ComponentActivity, repository: UpdateRepo
                 Button(onClick = { channel = UpdateChannel.GOOGLE_PLAY; repository.setChannel(channel) }) { Text("Play") }
             }
             Text("Selected: ${channel.name.replace('_', ' ')}", style = MaterialTheme.typography.labelMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = !busy, onClick = {
+            Button(
+                enabled = !busy && remoteConfig?.maintenance != true,
+                onClick = {
+                    release = null
                     busy = true
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            runCatching { repository.checkDirectRelease() }
+                    when (channel) {
+                        UpdateChannel.DIRECT -> checkDirectRelease()
+                        UpdateChannel.GOOGLE_PLAY -> checkPlay()
+                        UpdateChannel.AUTOMATIC -> {
+                            if (remoteConfig?.googlePlayUpdates != false) {
+                                repository.checkPlayUpdate(activity) { available ->
+                                    if (available) {
+                                        status = repository.lastStatus
+                                        busy = false
+                                    } else if (remoteConfig?.directUpdates != false) {
+                                        checkDirectRelease()
+                                    } else {
+                                        status = "No enabled update channel has an update."
+                                        busy = false
+                                    }
+                                }
+                            } else if (remoteConfig?.directUpdates != false) {
+                                checkDirectRelease()
+                            } else {
+                                status = "Automatic updates are disabled by server settings."
+                                busy = false
+                            }
                         }
-                        release = result.getOrNull()
-                        status = result.fold(
-                            { if (it == null) repository.lastStatus else "Release ${it.tag} is available." },
-                            { "Direct update check failed: ${it.message}" }
-                        )
-                        busy = false
                     }
-                }) { Text("Check APK") }
-                Button(enabled = !busy, onClick = {
-                    repository.checkPlayUpdate(activity) { available ->
-                        status = repository.lastStatus
-                        if (available) repository.startPlayUpdate(activity, 4102)
-                    }
-                }) { Text("Check Play") }
+                }
+            ) { Text(if (busy) "Checking…" else "Check for updates") }
+            if (remoteConfig?.googlePlayUpdates != false && channel != UpdateChannel.DIRECT) {
+                Button(
+                    enabled = !busy,
+                    onClick = { repository.completePlayUpdate(); status = repository.lastStatus }
+                ) { Text("Install downloaded Play update") }
             }
-            if (release != null) {
+            if (release != null && remoteConfig?.directUpdates != false) {
                 Button(enabled = !busy, onClick = {
                     val selected = release ?: return@Button
                     busy = true
