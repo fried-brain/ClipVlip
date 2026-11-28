@@ -52,6 +52,11 @@ class ModelLibraryViewModel(application: Application) : AndroidViewModel(applica
     fun remove(model: ModelArtifact) {
         if (busy[model.id] == true) return
         repository.delete(model)
+        if (repository.installedFile(model).exists()) {
+            installed[model.id] = true
+            errors[model.id] = "Could not remove this model. Check storage permissions and try again."
+            return
+        }
         installed[model.id] = false
         progress.remove(model.id)
         errors.remove(model.id)
