@@ -44,9 +44,14 @@ class UpdateRepository(private val context: android.content.Context) {
         }
     }
 
+    var onStatusChanged: ((String) -> Unit)? = null
+
     var lastStatus: String
         get() = prefs.getString("last_status", "Updates not checked") ?: ""
-        private set(value) { prefs.edit().putString("last_status", value).apply() }
+        private set(value) {
+            prefs.edit().putString("last_status", value).apply()
+            onStatusChanged?.invoke(value)
+        }
 
     fun selectedChannel(): UpdateChannel = runCatching {
         UpdateChannel.valueOf(prefs.getString("channel", "AUTOMATIC")!!)
