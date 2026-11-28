@@ -1,7 +1,6 @@
 package com.friedbrain.clipvlip
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.ViewModelProvider
@@ -35,15 +34,19 @@ class MainActivity : ComponentActivity() {
                 surface = Color(0xFF151927)
             )) {
                 var screen by remember { mutableStateOf(AppScreen.HOME) }
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Surface(
+                    Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     when (screen) {
                         AppScreen.HOME -> LaunchScreen(
                             onModels = { screen = AppScreen.MODELS },
                             onUpdates = { screen = AppScreen.UPDATES }
                         )
                         AppScreen.MODELS -> {
-                            // Create the model ViewModel only after the user opens this screen.
-                            val modelVm = remember { ViewModelProvider(this@MainActivity)[ModelLibraryViewModel::class.java] }
+                            val modelVm = remember {
+                                ViewModelProvider(this@MainActivity)[ModelLibraryViewModel::class.java]
+                            }
                             ModelLibraryScreen(modelVm, onBack = { screen = AppScreen.HOME })
                         }
                         AppScreen.UPDATES -> UpdateScreen(
@@ -54,6 +57,28 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ScreenTopBar(title: String, onBack: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TextButton(
+            onClick = onBack,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+        ) {
+            Text("‹  Back", style = MaterialTheme.typography.titleMedium)
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFFE9E7F2)
+        )
     }
 }
 
@@ -84,12 +109,12 @@ private fun LaunchScreen(onModels: () -> Unit, onUpdates: () -> Unit) {
 @Composable
 private fun ModelLibraryScreen(viewModel: ModelLibraryViewModel, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
-        TextButton(onClick = onBack) { Text("← Back") }
+        ScreenTopBar("AI Model Library", onBack)
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("LOCAL AI MODEL LIBRARY", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("LOCAL AI MODEL LIBRARY", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text("Download models separately. Remove them whenever you need storage.", color = Color(0xFFABB3C5))
             ModelCatalog.models.forEach { model ->
                 ModelCard(
@@ -170,17 +195,20 @@ private fun UpdateScreen(activity: ComponentActivity, onBack: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
-        TextButton(onClick = onBack) { Text("← Back") }
-        Text("APP UPDATE CENTRE", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+        ScreenTopBar("App Updates", onBack)
+        Text("APP UPDATE CENTRE", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
         Text("Select an update route. Direct APK updates require Android install approval; Play updates require a Play-installed app.", color = Color(0xFFABB3C5))
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(onClick = { channel = UpdateChannel.AUTOMATIC; repository.setChannel(channel) }) { Text("Auto") }
             Button(onClick = { channel = UpdateChannel.DIRECT; repository.setChannel(channel) }) { Text("Direct") }
             Button(onClick = { channel = UpdateChannel.GOOGLE_PLAY; repository.setChannel(channel) }) { Text("Play") }
         }
+        Spacer(Modifier.height(8.dp))
         Text("Selected: ${channel.name}")
+        Spacer(Modifier.height(10.dp))
         Button(
             enabled = !busy && config.maintenance.not(),
             onClick = {
@@ -234,5 +262,6 @@ private fun UpdateScreen(activity: ComponentActivity, onBack: () -> Unit) {
         if (busy) CircularProgressIndicator()
         Spacer(Modifier.height(10.dp))
         Text(status, color = Color(0xFFABB3C5))
+        Spacer(Modifier.height(24.dp))
     }
 }
