@@ -75,7 +75,7 @@ class ModelDownloadRepository(context: Context) {
                         FileOutputStream(partial).use { output ->
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE * 16)
                             while (true) {
-                                currentCoroutineContext().ensureActive()
+                                coroutineContext.ensureActive()
                                 val count = input.read(buffer)
                                 if (count < 0) break
                                 output.write(buffer, 0, count)
