@@ -1,6 +1,7 @@
 package com.friedbrain.clipvlip
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -151,7 +152,7 @@ class UpdateRepository(private val context: android.content.Context) {
     }
 
     fun checkPlayUpdate(activity: Activity, onResult: (Boolean) -> Unit) {
-        val manager = getPlayManager(activity)
+        val manager = getPlayManager(activity.applicationContext)
         manager.appUpdateInfo
             .addOnSuccessListener { info ->
                 when {
@@ -202,8 +203,8 @@ class UpdateRepository(private val context: android.content.Context) {
             }
     }
 
-    private fun getPlayManager(activity: Activity): AppUpdateManager {
-        return playManager ?: AppUpdateManagerFactory.create(activity.applicationContext).also { manager ->
+    private fun getPlayManager(context: Context): AppUpdateManager {
+        return playManager ?: AppUpdateManagerFactory.create(context.applicationContext).also { manager ->
             playManager = manager
             manager.registerListener(playListener)
         }
@@ -229,12 +230,7 @@ class UpdateRepository(private val context: android.content.Context) {
     }
 
     fun completePlayUpdate(onComplete: (String) -> Unit = {}) {
-        val manager = playManager
-        if (manager == null) {
-            lastStatus = "No downloaded Google Play update is waiting."
-            onComplete(lastStatus)
-            return
-        }
+        val manager = getPlayManager(context.applicationContext)
         manager.completeUpdate()
             .addOnSuccessListener {
                 lastStatus = "Google Play update installation has been handed to Android."
